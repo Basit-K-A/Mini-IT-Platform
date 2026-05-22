@@ -1,0 +1,10 @@
+# Keep Docker build context small and avoid baking secrets into images
+.git
+.gitignore
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+.env
+*.md
+agent-transcripts

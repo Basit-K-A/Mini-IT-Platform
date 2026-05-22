@@ -8,9 +8,10 @@ import os
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from dotenv import load_dotenv
 
-load_dotenv()
+from database import load_dotenv_files
+
+load_dotenv_files()
 
 # Generate a production secret with: openssl rand -hex 32
 SECRET_KEY = os.getenv(

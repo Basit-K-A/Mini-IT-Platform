@@ -27,8 +27,15 @@ from schemas.user import TokenData
 # bcrypt via passlib (portfolio-friendly and widely documented)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Used on failed login when username is missing — slows down user enumeration attacks
-DUMMY_HASH = pwd_context.hash("dummypassword")
+# Lazy init avoids import-time bcrypt/passlib errors; same timing-attack mitigation at login
+_dummy_hash: str | None = None
+
+
+def _get_dummy_hash() -> str:
+    global _dummy_hash
+    if _dummy_hash is None:
+        _dummy_hash = pwd_context.hash("dummypassword")
+    return _dummy_hash
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -44,7 +51,7 @@ def get_password_hash(password: str) -> str:
 def authenticate_user(db: Session, username: str, password: str) -> User | None:
     user = user_crud.get_user_by_username(db, username=username)
     if not user:
-        verify_password(password, DUMMY_HASH)
+        verify_password(password, _get_dummy_hash())
         return None
     if not verify_password(password, user.hashed_password):
         return None
