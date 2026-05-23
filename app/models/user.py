@@ -6,6 +6,7 @@ It is NOT used directly as API request/response bodies — use Pydantic schemas 
 """
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, String, func
+from sqlalchemy.orm import relationship
 
 from database import Base
 
@@ -20,3 +21,6 @@ class User(Base):
     role = Column(String(50), nullable=False, default="user")
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # One user can own many devices (SQLAlchemy relationship, not a DB column).
+    devices = relationship("Device", back_populates="owner")

@@ -15,7 +15,7 @@ from sqlalchemy.exc import OperationalError
 
 import models  # noqa: F401 — registers ORM models with Base.metadata
 from database import Base, check_database_connection, engine
-from routers import auth
+from routers import auth, devices, events
 
 logger = logging.getLogger(__name__)
 
@@ -53,3 +53,5 @@ app = FastAPI(
 )
 
 app.include_router(auth.router)
+app.include_router(devices.router)
+app.include_router(events.router)
