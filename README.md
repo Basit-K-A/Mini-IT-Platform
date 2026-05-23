@@ -33,12 +33,12 @@ Copy the example file and set a strong `SECRET_KEY`:
 copy .env.example .env
 ```
 
-| Variable | Description |
-|----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `SECRET_KEY` | JWT signing secret (`openssl rand -hex 32`) |
-| `JWT_ALGORITHM` | Default `HS256` |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | Token lifetime (default `30`) |
+| Variable                      | Description                                 |
+| ----------------------------- | ------------------------------------------- |
+| `DATABASE_URL`                | PostgreSQL connection string                |
+| `SECRET_KEY`                  | JWT signing secret (`openssl rand -hex 32`) |
+| `JWT_ALGORITHM`               | Default `HS256`                             |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Token lifetime (default `30`)               |
 
 **Docker networking:** Inside Compose, the API must use host `db` (the PostgreSQL service name), not `localhost`. `docker-compose.yml` sets `DATABASE_URL` for the `api` service automatically.
 
@@ -55,9 +55,9 @@ copy .env.example .env
 docker compose up --build
 ```
 
-- API: http://localhost:8000  
-- Swagger UI: http://localhost:8000/docs  
-- ReDoc: http://localhost:8000/redoc  
+- API: http://localhost:8000
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
 
 Stop containers (keep database data):
 
@@ -115,9 +115,13 @@ Listed in `requirements.txt`. Notable choices:
 
 ## Troubleshooting
 
-| Issue | Fix |
-|-------|-----|
-| API cannot connect to DB in Docker | Ensure `DATABASE_URL` uses `@db:5432`, not `@localhost` |
-| `ModuleNotFoundError` in container | Image runs `main:app` from `/app`; do not use `app.main:app` unless you convert to a package layout |
-| passlib / bcrypt warning on Windows | Pin `bcrypt<5` (already in requirements.txt) |
-| Empty database | Tables are created on API startup via `Base.metadata.create_all()` |
+| Issue                               | Fix                                                                                                 |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------- |
+| API cannot connect to DB in Docker  | Ensure `DATABASE_URL` uses `@db:5432`, not `@localhost`                                             |
+| `ModuleNotFoundError` in container  | Image runs `main:app` from `/app`; do not use `app.main:app` unless you convert to a package layout |
+| passlib / bcrypt warning on Windows | Pin `bcrypt<5` (already in requirements.txt)                                                        |
+| Empty database                      | Tables are created on API startup via `Base.metadata.create_all()`                                  |
+
+## Future features
+
+This is a WIP project and features like improved security and security features, cloud deployment, linux administration, and a frontend are soon to be added.
