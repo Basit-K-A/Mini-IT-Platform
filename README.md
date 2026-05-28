@@ -15,9 +15,14 @@ Internal infrastructure management platform: FastAPI API, PostgreSQL, JWT authen
 │   └── schemas/                # Pydantic request/response models
 ├── frontend/                   # React + Vite dashboard (Nexventory UI)
 ├── deploy/nginx/               # Reverse proxy config + static error pages
+├── .github/workflows/          # CI + deploy to EC2
+├── scripts/                    # deploy.sh, monitor.sh
 ├── docs/
 │   ├── DOCKER.md               # Docker networking, volumes, operations
-│   └── NGINX.md                # Reverse proxy, HTTPS prep, debugging
+│   ├── NGINX.md                # Reverse proxy, HTTPS prep, debugging
+│   ├── CICD.md                 # GitHub Actions, secrets, SSH deploy
+│   ├── EC2_SETUP.md            # Ubuntu server one-time setup
+│   └── MONITORING.md           # Logs, health checks, docker stats
 ├── requirements.txt
 ├── Dockerfile                  # API image (non-root, health check)
 ├── docker-compose.yml          # Base stack: nginx + api + db
@@ -180,10 +185,24 @@ npm run dev
 
 Open http://localhost:5173. Point the dashboard at the API through nginx: `VITE_API_URL=http://localhost` in `frontend/.env` (or `http://localhost:8000` for direct API in dev).
 
+## CI/CD and AWS deployment
+
+Push to `main` triggers GitHub Actions: build Docker images, SSH to EC2, `git pull`, `docker compose up -d --build`.
+
+| Guide | Contents |
+|-------|----------|
+| [docs/CICD.md](docs/CICD.md) | Workflows, GitHub Secrets, SSH keys |
+| [docs/EC2_SETUP.md](docs/EC2_SETUP.md) | Ubuntu, Docker, first deploy |
+| [docs/MONITORING.md](docs/MONITORING.md) | Logs, health checks, `docker stats` |
+
+**GitHub Secrets:** `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`, `EC2_DEPLOY_PATH`
+
+**On EC2:** `chmod +x scripts/deploy.sh && ./scripts/deploy.sh`
+
 ## Future features
 
-- AWS deployment (EC2 / ECS / RDS)
-- CI/CD and monitoring (GitHub Actions, health checks, logging/alerting)
-- HTTPS/TLS termination on nginx (Let's Encrypt)
+- HTTPS/TLS on nginx (Let's Encrypt)
+- React dashboard on S3 + CloudFront
+- RDS managed PostgreSQL
 - Alembic database migrations
-- Improved security hardening and Linux administration tooling
+- External uptime monitoring (UptimeRobot / CloudWatch)

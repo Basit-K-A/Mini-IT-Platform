@@ -1,20 +1,31 @@
 # Production-like overrides — merge with docker-compose.yml
 # Only nginx :80 is published; db and api stay on the internal network.
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
     restart: always
     env_file:
       - path: .env.prod
         required: false
-    # No ports: — DB reachable only as hostname "db" inside nexventory_backend network
+    logging: *default-logging
+    # No ports — DB reachable only as hostname "db" inside nexventory_backend network
 
   api:
     restart: always
     env_file:
       - path: .env.prod
         required: false
-    # Use image CMD (no --reload); no source bind mount
+    environment:
+      ENVIRONMENT: production
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    logging: *default-logging
 
   nginx:
     restart: always
+    logging: *default-logging

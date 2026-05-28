@@ -18,8 +18,11 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 import models  # noqa: F401 — registers ORM models with Base.metadata
 from database import Base, check_database_connection, engine
+from logging_config import setup_logging
+from middleware.request_logging import RequestLoggingMiddleware
 from routers import auth, devices, events, health
 
+setup_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -57,6 +60,7 @@ app = FastAPI(
 
 # Honor X-Forwarded-* from nginx (scheme, host, client IP for logs/rate limits later)
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+app.add_middleware(RequestLoggingMiddleware)
 
 # Comma-separated origins for the React dashboard (e.g. http://localhost:5173)
 _cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
