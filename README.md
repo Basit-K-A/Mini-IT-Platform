@@ -1,4 +1,4 @@
-# Mini IT Platform
+# Nexventory (Mini IT Platform)
 
 FastAPI backend with JWT authentication and PostgreSQL (SQLAlchemy ORM).
 
@@ -13,9 +13,14 @@ FastAPI backend with JWT authentication and PostgreSQL (SQLAlchemy ORM).
 │   ├── models/          # SQLAlchemy ORM models
 │   ├── routers/         # API routes
 │   └── schemas/         # Pydantic request/response models
-├── requirements.txt     # Python dependencies (used by Docker)
+├── requirements.txt
 ├── Dockerfile
-├── docker-compose.yml
+├── docker-compose.yml          # Base stack
+├── docker-compose.dev.yml      # Dev overrides (reload, DB port)
+├── docker-compose.prod.yml     # Prod-like overrides
+├── deploy/nginx/               # Reverse proxy config + static error pages
+├── docs/DOCKER.md              # Infrastructure guide
+├── docs/NGINX.md               # Reverse proxy guide
 └── .env.example
 ```
 
@@ -46,29 +51,39 @@ copy .env.example .env
 
 ## Run with Docker (recommended)
 
-From the project root:
+**Development** (hot reload, PostgreSQL on host port 5432):
+
+```powershell
+copy .env.dev.example .env.dev
+docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.yml up --build
+```
+
+**Quick start** (base compose only):
 
 ```powershell
 copy .env.example .env
-# Edit .env and set SECRET_KEY
-
-docker compose up --build
+docker compose --env-file .env up --build
 ```
 
-- API: http://localhost:8000
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
-
-Stop containers (keep database data):
+**Production-like** (detached, DB not exposed on host):
 
 ```powershell
-docker compose down
+copy .env.prod.example .env.prod
+# Edit strong passwords/secrets, then:
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up --build -d
 ```
 
-Stop and delete database volume:
+- API (via nginx): http://localhost
+- Health: http://localhost/health/ready
+- Swagger: http://localhost/docs
+- Dev direct API (bypass nginx): http://localhost:8000/docs
+
+Operations: **[docs/DOCKER.md](docs/DOCKER.md)** · Nginx: **[docs/NGINX.md](docs/NGINX.md)**
 
 ```powershell
-docker compose down -v
+docker compose down      # stop, keep DB volume
+docker compose down -v   # stop and wipe DB volume
+docker compose logs -f api
 ```
 
 ## Run locally without Docker
@@ -117,11 +132,26 @@ Listed in `requirements.txt`. Notable choices:
 
 | Issue                               | Fix                                                                                                 |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------- |
-| API cannot connect to DB in Docker  | Ensure `DATABASE_URL` uses `@db:5432`, not `@localhost`                                             |
+| API cannot connect to DB in Docker  | Ensure `DATABASE_URL` uses `@db:5432`, not `@localhost` (see [docs/DOCKER.md](docs/DOCKER.md))      |
+| Container unhealthy                 | `docker compose logs api` — DB must be healthy first; check `/health/ready`                       |
+| Password changed but DB won't start | Volume was initialized with old password — `docker compose down -v` (deletes data)                |
 | `ModuleNotFoundError` in container  | Image runs `main:app` from `/app`; do not use `app.main:app` unless you convert to a package layout |
 | passlib / bcrypt warning on Windows | Pin `bcrypt<5` (already in requirements.txt)                                                        |
 | Empty database                      | Tables are created on API startup via `Base.metadata.create_all()`                                  |
 
+## Nexventory frontend (React)
+
+Dashboard UI lives in `frontend/`. See [frontend/README.md](frontend/README.md).
+
+```powershell
+cd frontend
+copy .env.example .env
+npm install
+npm run dev
+```
+
+Open http://localhost:5173. Point the dashboard at the API through nginx: `VITE_API_URL=http://localhost` in `frontend/.env` (or `http://localhost:8000` for direct API in dev).
+
 ## Future features
 
-This is a WIP project and features like improved security and security features, cloud deployment, linux administration, and a frontend are soon to be added.
+Improved security hardening, cloud deployment, and Linux administration tooling.

@@ -1,0 +1,17 @@
+# Production-like overrides — merge with docker-compose.yml
+# Only nginx :80 is published; db and api stay on the internal network.
+
+services:
+  db:
+    restart: always
+    # No ports: — DB reachable only as hostname "db" inside nexventory_backend network
+
+  api:
+    restart: always
+    env_file:
+      - path: .env.prod
+        required: false
+    # Use image CMD (no --reload); no source bind mount
+
+  nginx:
+    restart: always

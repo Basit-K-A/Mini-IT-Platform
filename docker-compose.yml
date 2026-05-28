@@ -1,56 +1,105 @@
-# Docker Compose runs multiple containers on one virtual network.
-# Services reach each other by service name (e.g. "db"), NOT "localhost".
+# Nexventory — base Compose stack (nginx + api + PostgreSQL)
+# Public entrypoint: http://localhost (nginx :80) — not the api port directly.
 #
-# Start everything:
-#   docker compose up --build
+# Development (hot reload + publish DB port):
+#   copy .env.dev.example .env.dev
+#   docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.yml up --build
 #
-# Stop and remove containers (keep DB data in volume):
-#   docker compose down
+# Production-like (no DB on host, detached):
+#   copy .env.prod.example .env.prod
+#   docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up --build -d
 #
-# Stop and remove containers + database volume:
-#   docker compose down -v
+# Default (base only, good for quick start):
+#   copy .env.example .env
+#   docker compose --env-file .env up --build
+
+name: nexventory
 
 services:
   db:
-    image: postgres:17
-    container_name: mini_it_db
+    image: postgres:17-alpine
+    container_name: nexventory_db
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      # Must match POSTGRES_PASSWORD in your .env (used by api DATABASE_URL below)
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
       POSTGRES_DB: ${POSTGRES_DB:-mini_it_platform}
-    ports:
-      # Host 5432 → container 5432 (optional: connect with pgAdmin from your machine)
-      - "5432:5432"
     volumes:
-      # Persist data across container restarts
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d mini_it_platform"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB",
+        ]
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 10s
+    networks:
+      - backend
 
   api:
-    build: .
-    container_name: mini_it_api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nexventory_api
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
-    ports:
-      - "8000:8000"
     environment:
-      # Inside Docker, host is the service name "db" — not localhost.
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-mini_it_platform}
-      JWT_ALGORITHM: HS256
-      ACCESS_TOKEN_EXPIRE_MINUTES: "30"
-      # Override in .env for real secrets (see .env.example)
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      # Service hostname "db" is the Compose service name on the internal network
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-mini_it_platform}
       SECRET_KEY: ${SECRET_KEY:-change-me-in-env-file}
-    env_file:
-      - .env
+      JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost}
+    # No ports published — traffic enters via nginx only (see docker-compose.dev.yml for direct API access)
+    expose:
+      - "8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - backend
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: nexventory_nginx
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${NGINX_PORT:-80}:80"
+    volumes:
+      - ./deploy/nginx/conf.d/nexventory.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./deploy/nginx/html:/usr/share/nginx/html:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - backend
+
+networks:
+  backend:
+    name: nexventory_backend
+    driver: bridge
 
 volumes:
   postgres_data:
+    name: nexventory_postgres_data

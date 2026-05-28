@@ -1,10 +1,35 @@
-# Keep Docker build context small and avoid baking secrets into images
+# Git and editor
 .git
 .gitignore
+.cursor
+.vscode
+*.md
+!app/**/*.md
+
+# Secrets and local env (never bake into images)
+.env
+.env.*
+!.env.*.example
+
+# Python virtualenv and caches
 **/.venv
 **/__pycache__
-**/*.pyc
+**/*.py[cod]
 **/.pytest_cache
-.env
-*.md
-agent-transcripts
+**/.mypy_cache
+**/.ruff_cache
+
+# Frontend (built/served separately; not part of API image)
+frontend/node_modules
+frontend/dist
+frontend/.env
+frontend/.env.*
+
+# Docker metadata (not needed inside build context)
+docker-compose*.yml
+docs/
+
+# OS / IDE noise
+.DS_Store
+Thumbs.db
+*.log

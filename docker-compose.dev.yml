@@ -1,0 +1,31 @@
+# Development overrides — merge with docker-compose.yml
+# Hot reload + optional host access to PostgreSQL (pgAdmin, psql on Windows host)
+
+services:
+  db:
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+
+  api:
+    # Optional: hit the API directly (bypass nginx) for debugging — Swagger at :8000/docs
+    ports:
+      - "${API_PORT:-8000}:8000"
+    env_file:
+      - path: .env.dev
+        required: false
+    volumes:
+      # Mount source for uvicorn --reload (dependencies stay from image layers)
+      - ./app:/app
+    command:
+      [
+        "uvicorn",
+        "main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--reload",
+        "--proxy-headers",
+        "--forwarded-allow-ips",
+        "*",
+      ]

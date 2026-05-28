@@ -8,14 +8,17 @@ main.py should stay small:
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import OperationalError
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 import models  # noqa: F401 — registers ORM models with Base.metadata
 from database import Base, check_database_connection, engine
-from routers import auth, devices, events
+from routers import auth, devices, events, health
 
 logger = logging.getLogger(__name__)
 
@@ -47,11 +50,25 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Mini IT Platform",
+    title="Nexventory API",
     description="Internal IT platform API with JWT auth and PostgreSQL",
     lifespan=lifespan,
 )
 
+# Honor X-Forwarded-* from nginx (scheme, host, client IP for logs/rate limits later)
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+
+# Comma-separated origins for the React dashboard (e.g. http://localhost:5173)
+_cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in _cors_origins.split(",") if o.strip()],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(devices.router)
 app.include_router(events.router)
