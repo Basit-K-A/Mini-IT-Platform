@@ -161,6 +161,7 @@ Listed in `requirements.txt`. Notable choices:
 | Container unhealthy                 | `docker compose logs api` — DB must be healthy first; check `/health/ready`                         |
 | Port 80 already in use              | Set `NGINX_PORT=8080` in `.env` and use http://localhost:8080                                       |
 | CORS errors from React dashboard    | Add `http://localhost` to `CORS_ORIGINS`; set `VITE_API_URL=http://localhost` in `frontend/.env`    |
+| API unhealthy / password auth failed | Root `.env` and `.env.dev` disagree on `POSTGRES_PASSWORD`, or volume has old password — sync both files or `docker compose down -v` |
 | Password changed but DB won't start | Volume was initialized with old password — `docker compose down -v` (deletes data)                |
 | `ModuleNotFoundError` in container  | Image runs `main:app` from `/app`; do not use `app.main:app` unless you convert to a package layout |
 | passlib / bcrypt warning on Windows | Pin `bcrypt<5` (already in requirements.txt)                                                        |

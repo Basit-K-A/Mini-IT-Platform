@@ -1,8 +1,14 @@
 # Development overrides — merge with docker-compose.yml
 # Hot reload + optional host access to PostgreSQL (pgAdmin, psql on Windows host)
+#
+# Use: docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.yml up
+# Keep POSTGRES_PASSWORD in sync with root .env (Compose loads .env for ${VAR} substitution).
 
 services:
   db:
+    env_file:
+      - path: .env.dev
+        required: false
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
 

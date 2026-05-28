@@ -4,6 +4,9 @@
 services:
   db:
     restart: always
+    env_file:
+      - path: .env.prod
+        required: false
     # No ports: — DB reachable only as hostname "db" inside nexventory_backend network
 
   api:
