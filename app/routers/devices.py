@@ -50,6 +50,7 @@ def create_device(
 
 @router.get("", response_model=list[DeviceResponse])
 def list_devices(
+    request: Request,
     _current_user: Annotated[User, Depends(get_current_active_user)],
     db: Session = Depends(get_db),
     skip: int = 0,

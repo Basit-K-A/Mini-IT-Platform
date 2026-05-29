@@ -22,3 +22,6 @@ bcrypt==4.0.1
 
 # Validation (EmailStr in schemas)
 pydantic[email]==2.13.4
+
+# Rate limiting
+slowapi==0.1.9

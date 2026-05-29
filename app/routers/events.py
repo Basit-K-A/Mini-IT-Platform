@@ -51,6 +51,7 @@ def create_event(
 
 @router.get("", response_model=list[EventResponse])
 def list_events(
+    request: Request,
     _current_user: Annotated[User, Depends(get_current_active_user)],
     db: Session = Depends(get_db),
     skip: int = 0,

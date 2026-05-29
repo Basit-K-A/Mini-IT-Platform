@@ -9,17 +9,28 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from auth.password_policy import validate_password_strength
 from constants.roles import ALLOWED_ROLES, DEFAULT_ROLE, is_valid_role
 
 
 class UserCreate(BaseModel):
     """Body for POST /register."""
 
-    username: str = Field(min_length=3, max_length=50)
+    username: str = Field(
+        min_length=3,
+        max_length=50,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        description="Alphanumeric, underscore, hyphen only",
+    )
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    # Public registration always becomes viewer; role is set in the register route
     role: str = DEFAULT_ROLE
+
+    @field_validator("password")
+    @classmethod
+    def strong_password(cls, value: str) -> str:
+        validate_password_strength(value)
+        return value
 
 
 class UserLogin(BaseModel):
@@ -49,7 +60,15 @@ class UserResponse(BaseModel):
 
 class Token(BaseModel):
     access_token: str
-    token_type: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int = Field(description="Access token lifetime in seconds")
+
+
+class TokenRefreshRequest(BaseModel):
+    """Body for POST /token/refresh."""
+
+    refresh_token: str = Field(min_length=20, max_length=2048)
 
 
 class TokenData(BaseModel):

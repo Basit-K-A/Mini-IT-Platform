@@ -17,19 +17,19 @@ from sqlalchemy.exc import OperationalError
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 import models  # noqa: F401 — registers ORM models with Base.metadata
+from core.limiter import limiter
 from database import Base, check_database_connection, engine
 from logging_config import setup_logging
+from middleware.exception_handlers import register_exception_handlers
 from middleware.request_logging import RequestLoggingMiddleware
+from middleware.security_headers import SecurityHeadersMiddleware
 from routers import audit, auth, devices, events, health, users
 
 setup_logging()
 logger = logging.getLogger(__name__)
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # For a portfolio project, create_all() is enough to bootstrap tables.
-    # Later you can replace this with Alembic migrations.
     try:
         check_database_connection()
         Base.metadata.create_all(bind=engine)
@@ -58,18 +58,25 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Honor X-Forwarded-* from nginx (scheme, host, client IP for logs/rate limits later)
+# Rate limiting (SlowAPI) — must attach limiter to app state before routes run
+app.state.limiter = limiter
+register_exception_handlers(app)
+
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 app.add_middleware(RequestLoggingMiddleware)
 
-# Comma-separated origins for the React dashboard (e.g. http://localhost:5173)
-_cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+# Explicit origins only — do not use allow_origins=["*"] with credentials
+_cors_origins = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173,http://localhost",
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in _cors_origins.split(",") if o.strip()],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 
 app.include_router(health.router)

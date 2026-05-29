@@ -19,7 +19,7 @@ def get_events(db: Session, skip: int = 0, limit: int = 100) -> list[Event]:
 def create_event(db: Session, event_in: EventCreate) -> Event:
     db_event = Event(
         event_type=event_in.event_type,
-        severity=event_in.severity,
+        severity=event_in.severity.value,
         message=event_in.message,
         device_id=event_in.device_id,
     )

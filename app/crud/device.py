@@ -21,7 +21,7 @@ def create_device(db: Session, device_in: DeviceCreate) -> Device:
         hostname=device_in.hostname,
         ip_address=device_in.ip_address,
         operating_system=device_in.operating_system,
-        status=device_in.status,
+        status=device_in.status.value,
         owner_id=device_in.owner_id,
     )
     db.add(db_device)
@@ -34,7 +34,7 @@ def update_device(db: Session, device: Device, device_in: DeviceUpdate) -> Devic
     device.hostname = device_in.hostname
     device.ip_address = device_in.ip_address
     device.operating_system = device_in.operating_system
-    device.status = device_in.status
+    device.status = device_in.status.value
     device.owner_id = device_in.owner_id
     db.commit()
     db.refresh(device)

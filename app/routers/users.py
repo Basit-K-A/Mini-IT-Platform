@@ -21,6 +21,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 @router.get("", response_model=list[UserResponse])
 def list_users(
+    request: Request,
     _admin: Annotated[User, Depends(require_role(ROLE_ADMIN))],
     db: Session = Depends(get_db),
     skip: int = 0,
