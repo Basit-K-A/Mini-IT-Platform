@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from auth.jwt_handler import create_access_token
 from constants.audit_actions import AuditAction
+from constants.roles import DEFAULT_ROLE
 from crud import user as user_crud
 from services.audit import log_audit
 from auth.security import (
@@ -34,7 +35,9 @@ def register_user(user_in: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Email already registered")
 
     hashed_password = get_password_hash(user_in.password)
-    return user_crud.create_user(db, user_in, hashed_password)
+    # New accounts are always viewers — admins promote roles via PATCH /users/{id}/role
+    registration = user_in.model_copy(update={"role": DEFAULT_ROLE})
+    return user_crud.create_user(db, registration, hashed_password)
 
 
 @router.post("/token", response_model=Token)

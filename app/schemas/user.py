@@ -7,7 +7,9 @@ They are separate from SQLAlchemy models on purpose (see final explanation).
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+
+from constants.roles import ALLOWED_ROLES, DEFAULT_ROLE, is_valid_role
 
 
 class UserCreate(BaseModel):
@@ -16,7 +18,8 @@ class UserCreate(BaseModel):
     username: str = Field(min_length=3, max_length=50)
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    role: str = "user"
+    # Public registration always becomes viewer; role is set in the register route
+    role: str = DEFAULT_ROLE
 
 
 class UserLogin(BaseModel):
@@ -51,3 +54,17 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: str | None = None
+
+
+class UserRoleUpdate(BaseModel):
+    """Admin-only body for PATCH /users/{id}/role."""
+
+    role: str = Field(min_length=1, max_length=50)
+
+    @field_validator("role")
+    @classmethod
+    def role_must_be_allowed(cls, value: str) -> str:
+        if not is_valid_role(value):
+            allowed = ", ".join(sorted(ALLOWED_ROLES))
+            raise ValueError(f"role must be one of: {allowed}")
+        return value

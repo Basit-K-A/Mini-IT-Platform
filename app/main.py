@@ -20,7 +20,7 @@ import models  # noqa: F401 — registers ORM models with Base.metadata
 from database import Base, check_database_connection, engine
 from logging_config import setup_logging
 from middleware.request_logging import RequestLoggingMiddleware
-from routers import audit, auth, devices, events, health
+from routers import audit, auth, devices, events, health, users
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -74,6 +74,7 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(users.router)
 app.include_router(audit.router)
 app.include_router(devices.router)
 app.include_router(events.router)
