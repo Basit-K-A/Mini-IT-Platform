@@ -26,3 +26,4 @@ class User(Base):
     # One user can own many devices (SQLAlchemy relationship, not a DB column).
     devices = relationship("Device", back_populates="owner")
     audit_logs = relationship("AuditLog", back_populates="user")
+    alerts = relationship("Alert", back_populates="user")
