@@ -31,6 +31,12 @@ Rebuild the API image after pulling: `docker compose ... up -d --build api`
 
 Refresh tokens include `typ: refresh` and are rejected on protected routes.
 
+## Swagger /docs blank page
+
+If `/docs` is blank but `/openapi.json` returns 200, the API is fine — the browser blocked
+Swagger UI scripts due to `Content-Security-Policy: default-src 'none'`. Documentation paths
+now use a relaxed CSP (see `app/middleware/security_headers.py`).
+
 ## Testing in Swagger
 
 1. Register with strong password: `Admin123!`
