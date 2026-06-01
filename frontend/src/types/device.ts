@@ -4,7 +4,9 @@ export interface Device {
   ip_address: string
   operating_system: string
   status: string
+  department?: string | null
   owner_id: number
+  created_at?: string | null
 }
 
 export interface DeviceCreate {
@@ -12,5 +14,15 @@ export interface DeviceCreate {
   ip_address: string
   operating_system: string
   status: string
+  department?: string | null
+  owner_id: number
+}
+
+export interface DeviceUpdate {
+  hostname: string
+  ip_address: string
+  operating_system: string
+  status: string
+  department?: string | null
   owner_id: number
 }

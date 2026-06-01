@@ -19,7 +19,7 @@ from database import get_db
 from dependencies.list_params import EventListParams
 from models.user import User
 from schemas.event import EventCreate, EventResponse
-from schemas.pagination import PaginatedResponse
+from schemas.pagination import PaginatedResponse, paginated_response
 from services.audit import log_audit_background
 from services.background_tasks import schedule_cache_invalidation
 from services.list_cache import cached_paginated_list
@@ -75,6 +75,6 @@ def list_events(
 
     def _build() -> PaginatedResponse[EventResponse]:
         items, meta = event_crud.list_events(db, params)
-        return PaginatedResponse(data=items, pagination=meta)
+        return paginated_response(items, meta, EventResponse)
 
     return cached_paginated_list("events", params, _build)

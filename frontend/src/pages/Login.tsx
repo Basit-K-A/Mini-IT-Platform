@@ -1,16 +1,19 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { login } from '../api/auth'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { useAuth } from '../hooks/useAuth'
-import { login } from '../services/auth'
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { isAuthenticated, refreshUser, loading } = useAuth()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  const registered = (location.state as { registered?: boolean } | null)?.registered
 
   if (!loading && isAuthenticated) {
     return <Navigate to="/" replace />
@@ -41,6 +44,10 @@ export function LoginPage() {
           <h1>Nexventory</h1>
           <p>Infrastructure &amp; security dashboard</p>
         </div>
+
+        {registered ? (
+          <p className="login-card__success">Account created. Sign in below.</p>
+        ) : null}
 
         <ErrorMessage message={error} />
 
@@ -73,8 +80,7 @@ export function LoginPage() {
         </form>
 
         <p className="login-card__hint">
-          Use credentials from <code>POST /register</code> or Swagger at{' '}
-          <code>/docs</code>.
+          No account? <Link to="/register">Register</Link>
         </p>
       </div>
     </div>

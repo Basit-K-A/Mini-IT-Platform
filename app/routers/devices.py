@@ -10,8 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from auth.roles import require_any_role
-from auth.security import get_current_active_user
+from auth.roles import require_any_role, require_role
 from constants.audit_actions import AuditAction
 from constants.roles import ROLE_ADMIN, ROLE_TECHNICIAN
 from crud import device as device_crud
@@ -20,14 +19,19 @@ from database import get_db
 from dependencies.list_params import DeviceListParams
 from models.user import User
 from schemas.device import DeviceCreate, DeviceResponse, DeviceUpdate
-from schemas.pagination import PaginatedResponse
+from schemas.pagination import PaginatedResponse, paginated_response
 from services.audit import log_audit_background
 from services.background_tasks import schedule_cache_invalidation, schedule_placeholder
 from services.list_cache import cached_paginated_list
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
-RequireDeviceWrite = require_any_role(ROLE_ADMIN, ROLE_TECHNICIAN)
+# RBAC for devices:
+# - read/update: admin + technician (viewers are blocked entirely)
+# - create/delete: admin only (technicians may edit, not provision or remove)
+RequireDeviceRead = require_role([ROLE_ADMIN, ROLE_TECHNICIAN])
+RequireDeviceUpdate = require_any_role(ROLE_ADMIN, ROLE_TECHNICIAN)
+RequireDeviceAdmin = require_role(ROLE_ADMIN)
 
 
 @router.post(
@@ -41,7 +45,7 @@ def create_device(
     device_in: DeviceCreate,
     request: Request,
     background_tasks: BackgroundTasks,
-    current_user: Annotated[User, Depends(RequireDeviceWrite)],
+    current_user: Annotated[User, Depends(RequireDeviceAdmin)],
     db: Session = Depends(get_db),
 ):
     if not user_crud.get_user_by_id(db, device_in.owner_id):
@@ -68,19 +72,20 @@ def create_device(
 )
 def list_devices(
     request: Request,
-    _current_user: Annotated[User, Depends(get_current_active_user)],
+    _current_user: Annotated[User, Depends(RequireDeviceRead)],
     params: Annotated[DeviceListParams, Depends()],
     db: Session = Depends(get_db),
 ):
     """
     List inventory devices with optional filters, sorting, and pagination.
 
+    RBAC: admin and technician only (viewers cannot see devices).
     Responses are cached briefly in Redis when available.
     """
 
     def _build() -> PaginatedResponse[DeviceResponse]:
         items, meta = device_crud.list_devices(db, params)
-        return PaginatedResponse(data=items, pagination=meta)
+        return paginated_response(items, meta, DeviceResponse)
 
     return cached_paginated_list("devices", params, _build)
 
@@ -95,7 +100,7 @@ def update_device(
     device_in: DeviceUpdate,
     request: Request,
     background_tasks: BackgroundTasks,
-    current_user: Annotated[User, Depends(RequireDeviceWrite)],
+    current_user: Annotated[User, Depends(RequireDeviceUpdate)],
     db: Session = Depends(get_db),
 ):
     device = device_crud.get_device(db, device_id)
@@ -114,3 +119,31 @@ def update_device(
     )
     schedule_cache_invalidation(background_tasks, "inventory")
     return updated
+
+
+@router.delete(
+    "/{device_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a device",
+)
+def delete_device(
+    device_id: int,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    current_user: Annotated[User, Depends(RequireDeviceAdmin)],
+    db: Session = Depends(get_db),
+):
+    device = device_crud.get_device(db, device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    hostname = device.hostname
+    device_crud.delete_device(db, device)
+    log_audit_background(
+        background_tasks,
+        request,
+        action=AuditAction.DEVICE_DELETED,
+        status_code=status.HTTP_204_NO_CONTENT,
+        user_id=current_user.id,
+        details=f"device_id={device_id} deleted hostname={hostname}",
+    )
+    schedule_cache_invalidation(background_tasks, "inventory")

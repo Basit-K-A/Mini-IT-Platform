@@ -5,7 +5,7 @@ Usage in a route:
     current_user: Annotated[User, Depends(require_any_role(Role.ADMIN, Role.ANALYST))]
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, Request, status
@@ -28,10 +28,11 @@ def _deny_access(
     action: str = AuditAction.PERMISSION_DENIED,
 ) -> None:
     """
-  Record a failed authorization attempt, then return 403 to the client.
+    Record a failed authorization attempt, then return 403 to the client.
 
-  Separation of duties: authentication already succeeded; this is authorization failure.
-  """
+    Separation of duties: authentication already succeeded; this is authorization failure.
+    The client receives a generic "Forbidden"; the audit log keeps the full detail.
+    """
     effective = normalize_role(user.role)
     log_audit(
         db,
@@ -44,10 +45,7 @@ def _deny_access(
             f"endpoint={request.url.path}"
         ),
     )
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail=f"Insufficient permissions. Required role(s): {', '.join(required_roles)}",
-    )
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
 
 
 def require_any_role(*allowed_roles: str) -> Callable:
@@ -74,8 +72,21 @@ def require_any_role(*allowed_roles: str) -> Callable:
     return checker
 
 
-def require_role(role: str) -> Callable:
-    """Require exactly one role (admin still bypasses)."""
-    if role not in ALLOWED_ROLES:
-        raise ValueError(f"Unknown role: {role}")
-    return require_any_role(role)
+def require_role(roles: str | Iterable[str]) -> Callable:
+    """
+    Require one of the given role(s). Admin always bypasses.
+
+    Accepts either a single role or a list/tuple of roles, e.g.:
+        require_role("admin")
+        require_role(["admin", "technician"])
+    """
+    if isinstance(roles, str):
+        role_list = [roles]
+    else:
+        role_list = list(roles)
+
+    unknown = [r for r in role_list if r not in ALLOWED_ROLES]
+    if unknown:
+        raise ValueError(f"Unknown role(s): {', '.join(unknown)}")
+
+    return require_any_role(*role_list)

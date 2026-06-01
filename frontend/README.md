@@ -1,41 +1,51 @@
-# Nexventory Frontend
+# Nexventory frontend
 
-Minimal React dashboard for the Nexventory FastAPI backend.
+React + Vite dashboard connected to the FastAPI backend.
 
-## Quick start
-
-1. Ensure the API is running at http://localhost:8000 (`docker compose up` or `uvicorn` from `app/`).
-2. Copy env and install:
+## Setup
 
 ```powershell
 cd frontend
-copy .env.example .env
+copy .env.example .env.local
 npm install
 npm run dev
 ```
 
-3. Open http://localhost:5173
-4. Register a user via Swagger (`POST /register`) or curl, then sign in.
+Open http://localhost:5173
 
-## Environment
+## API URL (`VITE_API_URL`)
 
-| Variable       | Description                          |
-| -------------- | ------------------------------------ |
-| `VITE_API_URL` | FastAPI base URL (no trailing slash) |
+| Mode | Value | Backend |
+|------|--------|---------|
+| Dev (direct API) | `http://localhost:8000` | `docker-compose.dev.yml` publishes API :8000 |
+| Dev (via nginx) | `http://localhost/api` | Base stack on :80 with `/api` proxy |
+| Production | `https://your-api-host` | No hardcoded localhost |
 
-## Scripts
+## Auth (backend mapping)
 
-| Command        | Description              |
-| -------------- | ------------------------ |
-| `npm run dev`  | Vite dev server (:5173)  |
-| `npm run build`| Production build to `dist/` |
-| `npm run preview` | Preview production build |
+| UI | FastAPI |
+|----|---------|
+| Register | `POST /register` |
+| Login | `POST /token` (form login) |
+| Current user | `GET /users/me/` |
 
-## Docker (standalone)
+JWT is stored in `localStorage` and sent as `Authorization: Bearer`.
 
-```powershell
-docker build -t nexventory-frontend --build-arg VITE_API_URL=http://localhost:8000 ./frontend
-docker run -p 3000:80 nexventory-frontend
+## Roles
+
+- **Devices** (create/edit/delete): `admin`, `technician`
+- **Audit logs**: `admin`, `analyst`
+- **Viewer**: read devices/events only
+
+Promote roles via API (`PATCH /users/{id}/role`) or SQL.
+
+## Project structure
+
 ```
-
-Set `VITE_API_URL` at **build time** to the URL browsers will use to reach the API.
+src/
+  api/          # HTTP client + resource modules
+  store/        # Zustand (devices list state)
+  hooks/        # Auth context
+  pages/        # Routes
+  components/
+```

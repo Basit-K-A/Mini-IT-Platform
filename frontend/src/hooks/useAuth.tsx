@@ -7,9 +7,10 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { fetchCurrentUser } from '../services/auth'
-import { clearToken, getToken } from '../services/api'
+import { fetchCurrentUser, logout as apiLogout } from '../api/auth'
+import { clearTokens, getToken, setUnauthorizedHandler } from '../api/client'
 import type { User } from '../types/user'
+import { getPermissions, homeRouteForRole, type Permissions } from '../utils/permissions'
 
 interface AuthContextValue {
   user: User | null
@@ -18,6 +19,10 @@ interface AuthContextValue {
   setUser: (user: User | null) => void
   logout: () => void
   refreshUser: () => Promise<void>
+  permissions: Permissions
+  homeRoute: string
+  canAccessAudit: boolean
+  canManageDevices: boolean
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -36,19 +41,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const me = await fetchCurrentUser()
       setUser(me)
     } catch {
-      clearToken()
+      clearTokens()
       setUser(null)
     }
   }, [])
 
   useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setUser(null)
+      if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
+        window.location.assign('/login')
+      }
+    })
     refreshUser().finally(() => setLoading(false))
   }, [refreshUser])
 
   const logout = useCallback(() => {
-    clearToken()
+    apiLogout()
     setUser(null)
   }, [])
+
+  const permissions = useMemo(() => getPermissions(user?.role), [user?.role])
+  const homeRoute = useMemo(() => homeRouteForRole(user?.role), [user?.role])
+  const canAccessAudit = permissions.canViewAudit
+  const canManageDevices = permissions.canManageDevices
 
   const value = useMemo(
     () => ({
@@ -58,8 +74,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser,
       logout,
       refreshUser,
+      permissions,
+      homeRoute,
+      canAccessAudit,
+      canManageDevices,
     }),
-    [user, loading, logout, refreshUser],
+    [user, loading, logout, refreshUser, permissions, homeRoute, canAccessAudit, canManageDevices],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

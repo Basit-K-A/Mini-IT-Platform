@@ -14,7 +14,7 @@ from crud import user as user_crud
 from database import get_db
 from dependencies.list_params import UserListParams
 from models.user import User
-from schemas.pagination import PaginatedResponse
+from schemas.pagination import PaginatedResponse, paginated_response
 from schemas.user import UserResponse, UserRoleUpdate
 from services.audit import log_audit_background
 from services.list_cache import cached_paginated_list
@@ -40,7 +40,7 @@ def list_users(
     """
     def _build() -> PaginatedResponse[UserResponse]:
         items, meta = user_crud.list_users(db, params)
-        return PaginatedResponse(data=items, pagination=meta)
+        return paginated_response(items, meta, UserResponse)
 
     return cached_paginated_list("users", params, _build)
 

@@ -69,9 +69,22 @@ def create_device(db: Session, device_in: DeviceCreate) -> Device:
         owner_id=device_in.owner_id,
     )
     db.add(db_device)
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(db_device)
     return db_device
+
+
+def delete_device(db: Session, device: Device) -> None:
+    db.delete(device)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 def update_device(db: Session, device: Device, device_in: DeviceUpdate) -> Device:
@@ -81,6 +94,10 @@ def update_device(db: Session, device: Device, device_in: DeviceUpdate) -> Devic
     device.status = device_in.status.value
     device.department = device_in.department
     device.owner_id = device_in.owner_id
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(device)
     return device

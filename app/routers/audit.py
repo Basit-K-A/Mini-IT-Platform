@@ -19,7 +19,7 @@ from database import get_db
 from dependencies.list_params import AuditLogListParams
 from models.user import User
 from schemas.audit_log import AuditLogResponse
-from schemas.pagination import PaginatedResponse
+from schemas.pagination import PaginatedResponse, paginated_response
 from services.list_cache import cached_paginated_list
 
 router = APIRouter(prefix="/audit-logs", tags=["audit"])
@@ -50,6 +50,6 @@ def list_audit_logs(
     """
     def _build() -> PaginatedResponse[AuditLogResponse]:
         items, meta = audit_crud.list_audit_logs(db, params)
-        return PaginatedResponse(data=items, pagination=meta)
+        return paginated_response(items, meta, AuditLogResponse)
 
     return cached_paginated_list("audit", params, _build)

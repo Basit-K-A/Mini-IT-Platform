@@ -68,7 +68,11 @@ def list_users(
 
 def update_user_role(db: Session, user: User, role: str) -> User:
     user.role = role
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(user)
     return user
 
@@ -83,6 +87,10 @@ def create_user(db: Session, user_in: UserCreate, hashed_password: str) -> User:
         is_active=True,
     )
     db.add(db_user)
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(db_user)
     return db_user

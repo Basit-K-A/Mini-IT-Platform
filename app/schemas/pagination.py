@@ -4,7 +4,8 @@ Standard paginated API envelope for list endpoints.
 Frontend tables/charts can bind to `data` and drive paging UI from `pagination`.
 """
 
-from typing import Generic, TypeVar
+from collections.abc import Sequence
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -39,3 +40,21 @@ class PaginatedResponse(BaseModel, Generic[T]):
 
     data: list[T]
     pagination: PaginationMeta
+
+
+def paginated_response(
+    items: Sequence[Any],
+    meta: PaginationMeta,
+    item_schema: type[T],
+) -> PaginatedResponse[T]:
+    """
+    Build a paginated API envelope from ORM rows.
+
+    List endpoints must not put SQLAlchemy models in ``data`` — FastAPI's
+    ``response_model=PaginatedResponse[SomeSchema]`` validates each item and
+    rejects ORM instances with ResponseValidationError.
+    """
+    return PaginatedResponse(
+        data=[item_schema.model_validate(item) for item in items],
+        pagination=meta,
+    )

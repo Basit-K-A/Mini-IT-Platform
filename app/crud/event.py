@@ -65,6 +65,10 @@ def create_event(db: Session, event_in: EventCreate) -> Event:
     if event_in.timestamp is not None:
         db_event.timestamp = event_in.timestamp
     db.add(db_event)
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(db_event)
     return db_event

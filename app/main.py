@@ -19,6 +19,7 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 import models  # noqa: F401 — registers ORM models with Base.metadata
 from core.limiter import limiter
 from core.redis_client import close_redis, init_redis
+from core.schema_guard import ensure_schema
 from database import Base, check_database_connection, engine
 from logging_config import setup_logging
 from middleware.exception_handlers import register_exception_handlers
@@ -36,6 +37,8 @@ async def lifespan(app: FastAPI):
     try:
         check_database_connection()
         Base.metadata.create_all(bind=engine)
+        # Reconcile additive column drift on pre-existing tables (create_all won't).
+        ensure_schema(engine)
         logger.info("Database connected and tables are ready.")
     except OperationalError as exc:
         from urllib.parse import urlparse
@@ -84,7 +87,9 @@ app.add_middleware(RequestLoggingMiddleware)
 
 _cors_origins = os.getenv(
     "CORS_ORIGINS",
-    "http://localhost:5173,http://127.0.0.1:5173,http://localhost",
+    "http://localhost:5173,http://127.0.0.1:5173,"
+    "http://localhost:4173,http://127.0.0.1:4173,"
+    "http://localhost,http://127.0.0.1",
 )
 app.add_middleware(
     CORSMiddleware,

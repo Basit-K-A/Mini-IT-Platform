@@ -1,14 +1,16 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 
-const links = [
-  { to: '/', label: 'Dashboard', end: true },
-  { to: '/devices', label: 'Devices', end: false },
-  { to: '/events', label: 'Events', end: false },
-]
-
 export function Sidebar() {
-  const { user, logout } = useAuth()
+  const { user, logout, permissions } = useAuth()
+
+  // Build nav from permissions so each role sees only what it may access.
+  const links = [
+    permissions.canViewDashboard && { to: '/dashboard', label: 'Dashboard', end: false },
+    permissions.canViewEvents && { to: '/events', label: 'Events', end: false },
+    permissions.canViewDevices && { to: '/devices', label: 'Devices', end: false },
+    permissions.canViewAudit && { to: '/audit', label: 'Audit logs', end: false },
+  ].filter(Boolean) as { to: string; label: string; end: boolean }[]
 
   return (
     <aside className="sidebar">
@@ -38,7 +40,10 @@ export function Sidebar() {
       </nav>
 
       <div className="sidebar__footer">
-        <p className="sidebar__user">{user?.username ?? '—'}</p>
+        <p className="sidebar__user">
+          {user?.username ?? '—'}
+          {user?.role ? <span className="muted"> ({user.role})</span> : null}
+        </p>
         <button type="button" className="btn btn--ghost btn--small" onClick={logout}>
           Sign out
         </button>

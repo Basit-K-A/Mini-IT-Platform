@@ -34,6 +34,14 @@ Internal infrastructure management platform: FastAPI API, PostgreSQL, JWT authen
 └── .env.prod.example
 ```
 
+## Full stack (local)
+
+1. Start backend: `docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.yml up -d --build`
+2. Frontend: `cd frontend && copy .env.example .env.local && npm install && npm run dev`
+3. Open http://localhost:5173 — API at `VITE_API_URL` (default `http://localhost:8000`)
+
+See [frontend/README.md](frontend/README.md) for auth, roles, and API URL options.
+
 ## Prerequisites
 
 - Python 3.12+

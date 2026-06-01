@@ -6,7 +6,23 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    // Optional dev proxy — uncomment if you prefer not to enable CORS on the API
-    // proxy: { '/api': { target: 'http://localhost:8000', changeOrigin: true, rewrite: (p) => p.replace(/^\/api/, '') } },
+    // Proxy /api → Docker API on :8000 (same-origin in the browser; no CORS issues)
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
+  },
+  preview: {
+    port: 4173,
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
   },
 })

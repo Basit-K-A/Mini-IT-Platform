@@ -40,7 +40,11 @@ def create_audit_log(
         details=details,
     )
     db.add(entry)
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(entry)
     return entry
 
