@@ -112,7 +112,7 @@ services:
       - ./deploy/nginx/snippets:/etc/nginx/snippets:ro
       - ./deploy/nginx/html:/usr/share/nginx/html:ro
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/health >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://nexventory_api:8000/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
