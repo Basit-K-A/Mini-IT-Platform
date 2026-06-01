@@ -6,7 +6,7 @@ RBAC: read = any authenticated user; create = admin or technician.
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from auth.roles import require_any_role
@@ -20,7 +20,9 @@ from dependencies.list_params import EventListParams
 from models.user import User
 from schemas.event import EventCreate, EventResponse
 from schemas.pagination import PaginatedResponse
-from services.audit import log_audit
+from services.audit import log_audit_background
+from services.background_tasks import schedule_cache_invalidation
+from services.list_cache import cached_paginated_list
 
 router = APIRouter(prefix="/events", tags=["events"])
 
@@ -36,14 +38,15 @@ RequireEventWrite = require_any_role(ROLE_ADMIN, ROLE_TECHNICIAN)
 def create_event(
     event_in: EventCreate,
     request: Request,
+    background_tasks: BackgroundTasks,
     current_user: Annotated[User, Depends(RequireEventWrite)],
     db: Session = Depends(get_db),
 ):
     if not device_crud.get_device(db, event_in.device_id):
         raise HTTPException(status_code=404, detail="Device not found")
     event = event_crud.create_event(db, event_in)
-    log_audit(
-        db,
+    log_audit_background(
+        background_tasks,
         request,
         action=AuditAction.EVENT_CREATED,
         status_code=status.HTTP_201_CREATED,
@@ -53,6 +56,7 @@ def create_event(
             f"type={event.event_type} severity={event.severity}"
         ),
     )
+    schedule_cache_invalidation(background_tasks, "inventory")
     return event
 
 
@@ -67,12 +71,10 @@ def list_events(
     params: Annotated[EventListParams, Depends()],
     db: Session = Depends(get_db),
 ):
-    """
-    List device events with filters, sort, and pagination.
+    """List device events with filters, sort, and pagination (Redis-cached when enabled)."""
 
-    **Filters**: `device_id`, `severity`, `event_type`, `message_contains`
+    def _build() -> PaginatedResponse[EventResponse]:
+        items, meta = event_crud.list_events(db, params)
+        return PaginatedResponse(data=items, pagination=meta)
 
-    Default sort: newest `timestamp` first.
-    """
-    items, meta = event_crud.list_events(db, params)
-    return PaginatedResponse(data=items, pagination=meta)
+    return cached_paginated_list("events", params, _build)

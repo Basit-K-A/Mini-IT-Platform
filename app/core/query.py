@@ -10,8 +10,8 @@ from __future__ import annotations
 import math
 from typing import Any, TypeVar
 
-from sqlalchemy import asc, desc
-from sqlalchemy.orm import Query, Session
+from sqlalchemy import asc, desc, func
+from sqlalchemy.orm import Query
 from sqlalchemy.sql.elements import UnaryExpression
 
 from schemas.pagination import PaginationMeta
@@ -45,7 +45,16 @@ def paginate(
     """
     page = normalize_page(page)
     limit = normalize_limit(limit)
-    total_records = query.count()
+
+    # Count without ORDER BY overhead (faster than query.count() on sorted queries)
+    count_column = query.column_descriptions[0]["entity"] if query.column_descriptions else None
+    if count_column is not None and hasattr(count_column, "id"):
+        total_records = (
+            query.with_entities(func.count(count_column.id)).order_by(None).scalar() or 0
+        )
+    else:
+        total_records = query.order_by(None).count()
+
     total_pages = max(1, math.ceil(total_records / limit)) if total_records else 1
     if page > total_pages and total_records > 0:
         page = total_pages

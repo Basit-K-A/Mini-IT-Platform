@@ -31,6 +31,12 @@ def create_alert(
     db.add(alert)
     db.commit()
     db.refresh(alert)
+    try:
+        from services.cache import invalidate_dashboard
+
+        invalidate_dashboard()
+    except Exception:
+        pass
     return alert
 
 

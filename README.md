@@ -18,6 +18,7 @@ Internal infrastructure management platform: FastAPI API, PostgreSQL, JWT authen
 ├── .github/workflows/          # CI + deploy to EC2
 ├── scripts/                    # deploy.sh, monitor.sh
 ├── docs/
+│   ├── PERFORMANCE.md          # Redis cache, background tasks, indexes
 │   ├── DOCKER.md               # Docker networking, volumes, operations
 │   ├── NGINX.md                # Reverse proxy, HTTPS prep, debugging
 │   ├── CICD.md                 # GitHub Actions, secrets, SSH deploy
@@ -64,6 +65,11 @@ copy .env.prod.example .env.prod
 | `NGINX_PORT`                  | Host port for reverse proxy (default `80`)                        |
 | `API_PORT`                    | Dev only — direct API on host (default `8000`, bypasses nginx)    |
 | `ENVIRONMENT`                 | `development` or `production` (informational)                       |
+| `REDIS_URL`                   | Redis connection (`redis://redis:6379/0` in Compose)                |
+| `REDIS_ENABLED`               | `true` / `false` — disable cache without removing Redis             |
+| `CACHE_TTL_DASHBOARD`         | Seconds to cache dashboard aggregates (default `120`)               |
+| `SLOW_QUERY_MS`               | Log SQL slower than this threshold (default `500`)                  |
+| `SLOW_REQUEST_MS`             | Log HTTP slower than this threshold (default `1000`)                |
 
 **Docker networking:** Inside Compose, the API must use host `db` (the PostgreSQL service name), not `localhost`. `docker-compose.yml` sets `DATABASE_URL` for the `api` service automatically.
 
@@ -73,7 +79,9 @@ copy .env.prod.example .env.prod
 
 ## Run with Docker (recommended)
 
-Stack: **nginx** (public) → **api** (internal) → **db** (internal). Health checks on all services.
+Stack: **nginx** (public) → **api** (internal) → **db** + **redis** (internal). Health checks on all services.
+
+See [docs/PERFORMANCE.md](docs/PERFORMANCE.md) for caching, background tasks, and Alembic indexes.
 
 **Development** (hot reload, PostgreSQL on host port 5432, optional direct API on 8000):
 

@@ -4,7 +4,7 @@ Admin user management — list users and assign RBAC roles.
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from auth.roles import require_role
@@ -16,7 +16,8 @@ from dependencies.list_params import UserListParams
 from models.user import User
 from schemas.pagination import PaginatedResponse
 from schemas.user import UserResponse, UserRoleUpdate
-from services.audit import log_audit
+from services.audit import log_audit_background
+from services.list_cache import cached_paginated_list
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -37,8 +38,11 @@ def list_users(
 
     **Filters**: `role`, `is_active`, `username`, `email`
     """
-    items, meta = user_crud.list_users(db, params)
-    return PaginatedResponse(data=items, pagination=meta)
+    def _build() -> PaginatedResponse[UserResponse]:
+        items, meta = user_crud.list_users(db, params)
+        return PaginatedResponse(data=items, pagination=meta)
+
+    return cached_paginated_list("users", params, _build)
 
 
 @router.patch("/{user_id}/role", response_model=UserResponse, summary="Change user role")
@@ -46,6 +50,7 @@ def change_user_role(
     user_id: int,
     role_in: UserRoleUpdate,
     request: Request,
+    background_tasks: BackgroundTasks,
     admin: Annotated[User, Depends(require_role(ROLE_ADMIN))],
     db: Session = Depends(get_db),
 ):
@@ -60,8 +65,8 @@ def change_user_role(
         )
     previous = target.role
     updated = user_crud.update_user_role(db, target, role_in.role)
-    log_audit(
-        db,
+    log_audit_background(
+        background_tasks,
         request,
         action=AuditAction.ROLE_UPDATED,
         status_code=status.HTTP_200_OK,

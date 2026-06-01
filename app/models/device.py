@@ -4,7 +4,7 @@ SQLAlchemy model for managed IT devices.
 owner_id is a foreign key to users.id — each device belongs to one user.
 """
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, func
 from sqlalchemy.orm import relationship
 
 from database import Base
@@ -12,6 +12,11 @@ from database import Base
 
 class Device(Base):
     __tablename__ = "devices"
+    __table_args__ = (
+        Index("ix_devices_status_created", "status", "created_at"),
+        Index("ix_devices_department_status", "department", "status"),
+        Index("ix_devices_owner_status", "owner_id", "status"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     hostname = Column(String(255), nullable=False, index=True)

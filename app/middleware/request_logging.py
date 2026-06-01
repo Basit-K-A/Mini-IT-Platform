@@ -1,5 +1,7 @@
 """
 Log each HTTP request with method, path, status, and duration.
+
+Slow requests exceed SLOW_REQUEST_MS and are logged at WARNING level.
 """
 
 import logging
@@ -9,9 +11,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-logger = logging.getLogger("nexventory.access")
+from core.settings import get_settings
 
-# Skip noisy health probes (Docker / nginx / load balancers)
+logger = logging.getLogger("nexventory.access")
+perf_logger = logging.getLogger("nexventory.performance")
+
 _SKIP_PATHS = {"/health", "/health/ready"}
 
 
@@ -22,6 +26,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
         start = time.perf_counter()
         status_code = 500
+        slow_ms = get_settings().slow_request_ms
         try:
             response = await call_next(request)
             status_code = response.status_code
@@ -35,10 +40,11 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             raise
         finally:
             duration_ms = (time.perf_counter() - start) * 1000
-            logger.info(
-                "request_completed method=%s path=%s status=%s duration_ms=%.2f",
-                request.method,
-                request.url.path,
-                status_code,
-                duration_ms,
+            log_msg = (
+                "Request completed: %s %s — Duration: %.0fms (status=%s)"
+                % (request.method, request.url.path, duration_ms, status_code)
             )
+            if duration_ms >= slow_ms:
+                perf_logger.warning("%s [slow]", log_msg)
+            else:
+                logger.info(log_msg)

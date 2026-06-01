@@ -39,6 +39,21 @@ services:
     networks:
       - backend
 
+  redis:
+    image: redis:7-alpine
+    container_name: nexventory_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - backend
+
   api:
     build:
       context: .
@@ -48,14 +63,23 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       # Service hostname "db" is the Compose service name on the internal network
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-mini_it_platform}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      REDIS_ENABLED: ${REDIS_ENABLED:-true}
       SECRET_KEY: ${SECRET_KEY:-change-me-in-env-file}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost}
+      CACHE_TTL_DASHBOARD: ${CACHE_TTL_DASHBOARD:-120}
+      CACHE_TTL_LIST: ${CACHE_TTL_LIST:-60}
+      CACHE_TTL_STATS: ${CACHE_TTL_STATS:-300}
+      SLOW_QUERY_MS: ${SLOW_QUERY_MS:-500}
+      SLOW_REQUEST_MS: ${SLOW_REQUEST_MS:-1000}
     # No ports published — traffic enters via nginx only (see docker-compose.dev.yml for direct API access)
     expose:
       - "8000"
@@ -104,3 +128,5 @@ networks:
 volumes:
   postgres_data:
     name: nexventory_postgres_data
+  redis_data:
+    name: nexventory_redis_data

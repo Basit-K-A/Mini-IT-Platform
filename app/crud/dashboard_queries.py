@@ -26,6 +26,21 @@ def count_audit_action(db: Session, action: str, hours: int = 24) -> int:
     )
 
 
+def count_audit_actions_batch(db: Session, hours: int = 24) -> dict[str, int]:
+    """
+    Single grouped query for dashboard KPIs (replaces many per-action COUNT calls).
+
+    Uses ix_audit_logs_action_timestamp when present.
+    """
+    rows = (
+        db.query(AuditLog.action, func.count(AuditLog.id))
+        .filter(AuditLog.timestamp >= _since(hours))
+        .group_by(AuditLog.action)
+        .all()
+    )
+    return {action: count for action, count in rows}
+
+
 def count_distinct_active_users(db: Session, hours: int = 24) -> int:
     return (
         db.query(func.count(func.distinct(AuditLog.user_id)))
@@ -55,6 +70,41 @@ def get_failed_logins_by_ip(db: Session, hours: int = 24, limit: int = 20) -> li
         .limit(limit)
         .all()
     )
+
+
+def get_failed_logins_by_ip_enriched(
+    db: Session, hours: int = 24, limit: int = 20
+) -> list[tuple[str, int, datetime | None, list[str]]]:
+    """
+    Failed login aggregates without N+1 username lookups per IP.
+
+    Usernames are parsed from details in one pass over matching rows.
+    """
+    since = _since(hours)
+    aggregates = get_failed_logins_by_ip(db, hours=hours, limit=limit)
+    if not aggregates:
+        return []
+
+    ips = [row[0] for row in aggregates]
+    details_rows = (
+        db.query(AuditLog.ip_address, AuditLog.details)
+        .filter(
+            AuditLog.action == AuditAction.LOGIN_FAILED,
+            AuditLog.timestamp >= since,
+            AuditLog.ip_address.in_(ips),
+        )
+        .all()
+    )
+    names_by_ip: dict[str, set[str]] = {ip: set() for ip in ips}
+    for ip_address, details in details_rows:
+        if details and "username_attempted=" in details:
+            part = details.split("username_attempted=", 1)[-1].split()[0]
+            names_by_ip.setdefault(ip_address, set()).add(part)
+
+    return [
+        (ip, count, last_ts, sorted(names_by_ip.get(ip, set())))
+        for ip, count, last_ts in aggregates
+    ]
 
 
 def get_usernames_for_failed_logins(

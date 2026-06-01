@@ -4,7 +4,7 @@ SQLAlchemy model for device events (alerts, logs, status changes).
 device_id links each event to exactly one device.
 """
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import relationship
 
 from database import Base
@@ -12,6 +12,14 @@ from database import Base
 
 class Event(Base):
     __tablename__ = "events"
+    __table_args__ = (
+        # List/filter by device and recency
+        Index("ix_events_device_timestamp", "device_id", "timestamp"),
+        # Severity dashboards
+        Index("ix_events_severity_timestamp", "severity", "timestamp"),
+        # Top event types in time window
+        Index("ix_events_type_timestamp", "event_type", "timestamp"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     event_type = Column(String(100), nullable=False, index=True)

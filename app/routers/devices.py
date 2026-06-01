@@ -7,7 +7,7 @@ RBAC: read = any authenticated user; write = admin or technician.
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from auth.roles import require_any_role
@@ -21,7 +21,9 @@ from dependencies.list_params import DeviceListParams
 from models.user import User
 from schemas.device import DeviceCreate, DeviceResponse, DeviceUpdate
 from schemas.pagination import PaginatedResponse
-from services.audit import log_audit
+from services.audit import log_audit_background
+from services.background_tasks import schedule_cache_invalidation, schedule_placeholder
+from services.list_cache import cached_paginated_list
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
@@ -38,20 +40,23 @@ RequireDeviceWrite = require_any_role(ROLE_ADMIN, ROLE_TECHNICIAN)
 def create_device(
     device_in: DeviceCreate,
     request: Request,
+    background_tasks: BackgroundTasks,
     current_user: Annotated[User, Depends(RequireDeviceWrite)],
     db: Session = Depends(get_db),
 ):
     if not user_crud.get_user_by_id(db, device_in.owner_id):
         raise HTTPException(status_code=404, detail="Owner user not found")
     device = device_crud.create_device(db, device_in)
-    log_audit(
-        db,
+    log_audit_background(
+        background_tasks,
         request,
         action=AuditAction.DEVICE_CREATED,
         status_code=status.HTTP_201_CREATED,
         user_id=current_user.id,
         details=f"device_id={device.id} hostname={device.hostname}",
     )
+    schedule_cache_invalidation(background_tasks, "inventory")
+    schedule_placeholder(background_tasks, "device_created_notification", device_id=device.id)
     return device
 
 
@@ -70,14 +75,14 @@ def list_devices(
     """
     List inventory devices with optional filters, sorting, and pagination.
 
-    **Filters** (combinable): `status`, `department`, `owner_id`, `assigned_to`, `hostname`, `operating_system`
-
-    **Sort**: `sort_by` (id, hostname, status, department, owner_id, created_at, …), `sort_order` (asc|desc)
-
-    **Pagination**: `page` (default 1), `limit` (default 10, max 100)
+    Responses are cached briefly in Redis when available.
     """
-    items, meta = device_crud.list_devices(db, params)
-    return PaginatedResponse(data=items, pagination=meta)
+
+    def _build() -> PaginatedResponse[DeviceResponse]:
+        items, meta = device_crud.list_devices(db, params)
+        return PaginatedResponse(data=items, pagination=meta)
+
+    return cached_paginated_list("devices", params, _build)
 
 
 @router.put(
@@ -89,6 +94,7 @@ def update_device(
     device_id: int,
     device_in: DeviceUpdate,
     request: Request,
+    background_tasks: BackgroundTasks,
     current_user: Annotated[User, Depends(RequireDeviceWrite)],
     db: Session = Depends(get_db),
 ):
@@ -98,12 +104,13 @@ def update_device(
     if not user_crud.get_user_by_id(db, device_in.owner_id):
         raise HTTPException(status_code=404, detail="Owner user not found")
     updated = device_crud.update_device(db, device, device_in)
-    log_audit(
-        db,
+    log_audit_background(
+        background_tasks,
         request,
         action=AuditAction.DEVICE_UPDATED,
         status_code=status.HTTP_200_OK,
         user_id=current_user.id,
         details=f"device_id={device_id} hostname={updated.hostname}",
     )
+    schedule_cache_invalidation(background_tasks, "inventory")
     return updated

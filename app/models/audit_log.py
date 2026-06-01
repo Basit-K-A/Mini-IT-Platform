@@ -5,7 +5,7 @@ Audit logs support compliance and incident response: they are append-only in nor
 operation (no update/delete routes in this phase).
 """
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String, Text, func
 from sqlalchemy.orm import relationship
 
 from database import Base
@@ -13,6 +13,14 @@ from database import Base
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
+    __table_args__ = (
+        # Dashboard filters: action + time window
+        Index("ix_audit_logs_action_timestamp", "action", "timestamp"),
+        # User activity rollups
+        Index("ix_audit_logs_user_timestamp", "user_id", "timestamp"),
+        # Brute-force / IP analytics
+        Index("ix_audit_logs_ip_timestamp", "ip_address", "timestamp"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     # Nullable: failed logins and anonymous actions may have no authenticated user

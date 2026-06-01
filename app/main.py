@@ -4,7 +4,7 @@ Application entry point.
 main.py should stay small:
 - create the FastAPI app
 - register routers
-- run startup tasks (e.g. create tables)
+- run startup tasks (e.g. create tables, Redis)
 """
 
 import logging
@@ -18,6 +18,7 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 import models  # noqa: F401 — registers ORM models with Base.metadata
 from core.limiter import limiter
+from core.redis_client import close_redis, init_redis
 from database import Base, check_database_connection, engine
 from logging_config import setup_logging
 from middleware.exception_handlers import register_exception_handlers
@@ -28,8 +29,10 @@ from routers import audit, auth, dashboard, devices, events, health, users
 setup_logging()
 logger = logging.getLogger(__name__)
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    init_redis()
     try:
         check_database_connection()
         Base.metadata.create_all(bind=engine)
@@ -50,15 +53,16 @@ async def lifespan(app: FastAPI):
             exc,
         )
     yield
+    close_redis()
 
 
 app = FastAPI(
     title="Nexventory API",
     description=(
         "Production-style internal IT platform API: JWT auth, RBAC, audit logging, "
-        "and paginated list endpoints with filtering and sorting."
+        "paginated list endpoints, Redis caching, and background tasks."
     ),
-    version="1.1.0",
+    version="1.2.0",
     lifespan=lifespan,
     openapi_tags=[
         {"name": "auth", "description": "Registration, login, token refresh"},
@@ -71,7 +75,6 @@ app = FastAPI(
     ],
 )
 
-# Rate limiting (SlowAPI) — must attach limiter to app state before routes run
 app.state.limiter = limiter
 register_exception_handlers(app)
 
@@ -79,7 +82,6 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 app.add_middleware(RequestLoggingMiddleware)
 
-# Explicit origins only — do not use allow_origins=["*"] with credentials
 _cors_origins = os.getenv(
     "CORS_ORIGINS",
     "http://localhost:5173,http://127.0.0.1:5173,http://localhost",
