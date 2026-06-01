@@ -2,18 +2,57 @@
 CRUD helpers for Event — database access only, no HTTP logic.
 """
 
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from core.query import apply_exact_filters, apply_ilike_filters, apply_sort, paginate
+from dependencies.list_params import EventListParams
 from models.event import Event
 from schemas.event import EventCreate
+from schemas.pagination import PaginationMeta
+
+_EVENT_SORT_COLUMNS = {
+    "id": Event.id,
+    "timestamp": Event.timestamp,
+    "event_type": Event.event_type,
+    "severity": Event.severity,
+    "device_id": Event.device_id,
+}
 
 
 def get_event(db: Session, event_id: int) -> Event | None:
     return db.query(Event).filter(Event.id == event_id).first()
 
 
-def get_events(db: Session, skip: int = 0, limit: int = 100) -> list[Event]:
-    return db.query(Event).order_by(Event.timestamp.desc()).offset(skip).limit(limit).all()
+def list_events(
+    db: Session,
+    params: EventListParams,
+) -> tuple[list[Event], PaginationMeta]:
+    query = db.query(Event)
+    query = apply_exact_filters(
+        query,
+        Event,
+        {
+            "device_id": params.device_id,
+            "severity": params.severity,
+            "event_type": params.event_type,
+        },
+    )
+    query = apply_ilike_filters(query, Event, {"message": params.message_contains})
+
+    try:
+        query = apply_sort(
+            query,
+            allowed_columns=_EVENT_SORT_COLUMNS,
+            sort_by=params.sort_by,
+            sort_order=params.sort_order,
+            default_column=Event.timestamp,
+            default_desc=True,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return paginate(query, page=params.page, limit=params.limit)
 
 
 def create_event(db: Session, event_in: EventCreate) -> Event:

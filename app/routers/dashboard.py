@@ -14,6 +14,7 @@ from auth.roles import require_any_role
 from constants.roles import ROLE_ADMIN, ROLE_ANALYST
 from core.limiter import limiter
 from crud import alert as alert_crud
+from crud import event as event_crud
 from database import get_db
 from models.user import User
 from schemas.alert import AlertResponse
@@ -130,6 +131,8 @@ def recent_security_events(
     limit: int = 50,
 ):
     """Recent infrastructure events (includes high/critical severities)."""
-    from crud import event as event_crud
+    from dependencies.list_params import EventListParams
 
-    return event_crud.get_events(db, limit=limit)
+    params = EventListParams(page=1, limit=min(limit, 100))
+    items, _ = event_crud.list_events(db, params)
+    return items

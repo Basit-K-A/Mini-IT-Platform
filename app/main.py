@@ -54,8 +54,21 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Nexventory API",
-    description="Internal IT platform API with JWT auth and PostgreSQL",
+    description=(
+        "Production-style internal IT platform API: JWT auth, RBAC, audit logging, "
+        "and paginated list endpoints with filtering and sorting."
+    ),
+    version="1.1.0",
     lifespan=lifespan,
+    openapi_tags=[
+        {"name": "auth", "description": "Registration, login, token refresh"},
+        {"name": "users", "description": "User administration (admin)"},
+        {"name": "devices", "description": "Device inventory CRUD and listing"},
+        {"name": "events", "description": "Device event log"},
+        {"name": "audit", "description": "Security audit trail (admin/analyst)"},
+        {"name": "dashboard", "description": "Security monitoring summaries"},
+        {"name": "health", "description": "Liveness and readiness probes"},
+    ],
 )
 
 # Rate limiting (SlowAPI) — must attach limiter to app state before routes run

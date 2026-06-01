@@ -17,17 +17,24 @@ from constants.roles import ROLE_ADMIN, ROLE_TECHNICIAN
 from crud import device as device_crud
 from crud import user as user_crud
 from database import get_db
+from dependencies.list_params import DeviceListParams
 from models.user import User
 from schemas.device import DeviceCreate, DeviceResponse, DeviceUpdate
+from schemas.pagination import PaginatedResponse
 from services.audit import log_audit
 
 router = APIRouter(prefix="/devices", tags=["devices"])
 
-# Reusable RBAC dependencies for this router
 RequireDeviceWrite = require_any_role(ROLE_ADMIN, ROLE_TECHNICIAN)
 
 
-@router.post("", response_model=DeviceResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=DeviceResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Register a device",
+    response_description="Created device record",
+)
 def create_device(
     device_in: DeviceCreate,
     request: Request,
@@ -48,19 +55,36 @@ def create_device(
     return device
 
 
-@router.get("", response_model=list[DeviceResponse])
+@router.get(
+    "",
+    response_model=PaginatedResponse[DeviceResponse],
+    summary="List devices (paginated)",
+    response_description="Devices matching filters with pagination metadata",
+)
 def list_devices(
     request: Request,
     _current_user: Annotated[User, Depends(get_current_active_user)],
+    params: Annotated[DeviceListParams, Depends()],
     db: Session = Depends(get_db),
-    skip: int = 0,
-    limit: int = 100,
 ):
-    """Read-only: all authenticated roles (viewer, analyst, technician, admin)."""
-    return device_crud.get_devices(db, skip=skip, limit=limit)
+    """
+    List inventory devices with optional filters, sorting, and pagination.
+
+    **Filters** (combinable): `status`, `department`, `owner_id`, `assigned_to`, `hostname`, `operating_system`
+
+    **Sort**: `sort_by` (id, hostname, status, department, owner_id, created_at, …), `sort_order` (asc|desc)
+
+    **Pagination**: `page` (default 1), `limit` (default 10, max 100)
+    """
+    items, meta = device_crud.list_devices(db, params)
+    return PaginatedResponse(data=items, pagination=meta)
 
 
-@router.put("/{device_id}", response_model=DeviceResponse)
+@router.put(
+    "/{device_id}",
+    response_model=DeviceResponse,
+    summary="Update a device",
+)
 def update_device(
     device_id: int,
     device_in: DeviceUpdate,

@@ -29,7 +29,19 @@ class EventCreate(BaseModel):
 
 
 class EventResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "id": 1,
+                "event_type": "disk_usage",
+                "severity": "high",
+                "message": "Disk usage above 90%",
+                "timestamp": "2026-05-28T12:00:00Z",
+                "device_id": 3,
+            }
+        },
+    )
 
     id: int
     event_type: str

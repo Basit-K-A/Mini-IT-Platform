@@ -24,7 +24,15 @@ class UserCreate(BaseModel):
     )
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    role: str = DEFAULT_ROLE
+    role: str = Field(default=DEFAULT_ROLE, max_length=50)
+
+    @field_validator("role")
+    @classmethod
+    def role_must_be_allowed(cls, value: str) -> str:
+        if not is_valid_role(value):
+            allowed = ", ".join(sorted(ALLOWED_ROLES))
+            raise ValueError(f"role must be one of: {allowed}")
+        return value
 
     @field_validator("password")
     @classmethod

@@ -16,8 +16,10 @@ from constants.roles import ROLE_ADMIN, ROLE_TECHNICIAN
 from crud import device as device_crud
 from crud import event as event_crud
 from database import get_db
+from dependencies.list_params import EventListParams
 from models.user import User
 from schemas.event import EventCreate, EventResponse
+from schemas.pagination import PaginatedResponse
 from services.audit import log_audit
 
 router = APIRouter(prefix="/events", tags=["events"])
@@ -25,7 +27,12 @@ router = APIRouter(prefix="/events", tags=["events"])
 RequireEventWrite = require_any_role(ROLE_ADMIN, ROLE_TECHNICIAN)
 
 
-@router.post("", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=EventResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create an event",
+)
 def create_event(
     event_in: EventCreate,
     request: Request,
@@ -49,13 +56,23 @@ def create_event(
     return event
 
 
-@router.get("", response_model=list[EventResponse])
+@router.get(
+    "",
+    response_model=PaginatedResponse[EventResponse],
+    summary="List events (paginated)",
+)
 def list_events(
     request: Request,
     _current_user: Annotated[User, Depends(get_current_active_user)],
+    params: Annotated[EventListParams, Depends()],
     db: Session = Depends(get_db),
-    skip: int = 0,
-    limit: int = 100,
 ):
-    """Read-only: all authenticated roles."""
-    return event_crud.get_events(db, skip=skip, limit=limit)
+    """
+    List device events with filters, sort, and pagination.
+
+    **Filters**: `device_id`, `severity`, `event_type`, `message_contains`
+
+    Default sort: newest `timestamp` first.
+    """
+    items, meta = event_crud.list_events(db, params)
+    return PaginatedResponse(data=items, pagination=meta)

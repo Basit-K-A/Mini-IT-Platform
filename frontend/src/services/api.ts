@@ -17,6 +17,16 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY)
 }
 
+export interface PaginatedResponse<T> {
+  data: T[]
+  pagination: {
+    total_records: number
+    total_pages: number
+    current_page: number
+    page_size: number
+  }
+}
+
 export class ApiError extends Error {
   status: number
 

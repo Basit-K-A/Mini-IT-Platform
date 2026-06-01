@@ -12,26 +12,36 @@ from constants.audit_actions import AuditAction
 from constants.roles import ROLE_ADMIN
 from crud import user as user_crud
 from database import get_db
+from dependencies.list_params import UserListParams
 from models.user import User
+from schemas.pagination import PaginatedResponse
 from schemas.user import UserResponse, UserRoleUpdate
 from services.audit import log_audit
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
-@router.get("", response_model=list[UserResponse])
+@router.get(
+    "",
+    response_model=PaginatedResponse[UserResponse],
+    summary="List users (paginated)",
+)
 def list_users(
     request: Request,
     _admin: Annotated[User, Depends(require_role(ROLE_ADMIN))],
+    params: Annotated[UserListParams, Depends()],
     db: Session = Depends(get_db),
-    skip: int = 0,
-    limit: int = 100,
 ):
-    """List all platform users. Admin only."""
-    return user_crud.get_users(db, skip=skip, limit=limit)
+    """
+    List platform users. Admin only.
+
+    **Filters**: `role`, `is_active`, `username`, `email`
+    """
+    items, meta = user_crud.list_users(db, params)
+    return PaginatedResponse(data=items, pagination=meta)
 
 
-@router.patch("/{user_id}/role", response_model=UserResponse)
+@router.patch("/{user_id}/role", response_model=UserResponse, summary="Change user role")
 def change_user_role(
     user_id: int,
     role_in: UserRoleUpdate,

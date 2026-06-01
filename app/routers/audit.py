@@ -11,35 +11,41 @@ import os
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
-from core.limiter import limiter
-
 from auth.roles import require_any_role
 from constants.roles import ROLE_ADMIN, ROLE_ANALYST
+from core.limiter import limiter
 from crud import audit as audit_crud
 from database import get_db
+from dependencies.list_params import AuditLogListParams
 from models.user import User
 from schemas.audit_log import AuditLogResponse
+from schemas.pagination import PaginatedResponse
 
 router = APIRouter(prefix="/audit-logs", tags=["audit"])
 
 RequireAuditRead = require_any_role(ROLE_ADMIN, ROLE_ANALYST)
 
-
 _AUDIT_READ_LIMIT = os.getenv("RATE_LIMIT_AUDIT", "30/minute")
 
 
-@router.get("", response_model=list[AuditLogResponse])
+@router.get(
+    "",
+    response_model=PaginatedResponse[AuditLogResponse],
+    summary="List audit logs (paginated)",
+)
 @limiter.limit(_AUDIT_READ_LIMIT)
 def list_audit_logs(
     request: Request,
     _current_user: Annotated[User, Depends(RequireAuditRead)],
+    params: Annotated[AuditLogListParams, Depends()],
     db: Session = Depends(get_db),
-    skip: int = 0,
-    limit: int = 100,
 ):
     """
-    Return recent audit entries (newest first).
+    Security audit trail with filters, sort, and pagination.
 
-    Sensitive security trail — not available to technician or viewer roles.
+    **Filters**: `action`, `user_id`, `ip_address`, `status_code`, `endpoint_contains`
+
+    Sensitive — admin and analyst roles only.
     """
-    return audit_crud.get_recent_audit_logs(db, skip=skip, limit=limit)
+    items, meta = audit_crud.list_audit_logs(db, params)
+    return PaginatedResponse(data=items, pagination=meta)
