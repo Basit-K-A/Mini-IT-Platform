@@ -2,6 +2,75 @@
 
 Internal infrastructure management platform: FastAPI API, PostgreSQL, JWT authentication, Docker Compose multi-container stack, Nginx reverse proxy, and a React dashboard.
 
+Nexventory tracks IT assets (devices), their events, and a full security **audit trail**, with
+role-based access control and a SIEM-style monitoring dashboard. It is built to demonstrate
+production concerns end to end: authentication, RBAC, structured logging, centralized error
+handling, caching, health probes, automated tests, and CI/CD to AWS.
+
+## Features
+
+- **JWT authentication** — OAuth2 password flow with short-lived access + refresh tokens
+- **RBAC** — `admin` / `analyst` / `technician` / `viewer` roles enforced per endpoint
+- **Device & event management** — paginated, filterable, sortable CRUD
+- **Audit logging** — append-only security trail (sync for auth events, background for mutations)
+- **Security dashboard** — KPIs, failed-login and top-IP analytics
+- **Reliability** — health probes, Redis caching with graceful fallback, rate limiting + login lockout
+- **Observability** — structured JSON logging with request-id correlation, slow query/request logs
+- **Centralized error handling** — one error envelope, no stack traces leaked to clients
+- **Tested** — pytest unit + integration suites (SQLite test DB)
+- **Containerized & CI/CD** — Docker Compose stack, GitHub Actions deploy to EC2 behind nginx
+
+## Tech stack
+
+| Layer | Technology |
+|-------|------------|
+| API | FastAPI, Uvicorn (Python 3.12) |
+| Data | PostgreSQL, SQLAlchemy 2.0, Alembic |
+| Auth | PyJWT (HS256), passlib + bcrypt |
+| Cache / limiting | Redis, slowapi |
+| Frontend | React + Vite (TypeScript) |
+| Edge | nginx reverse proxy |
+| Runtime | Docker, Docker Compose |
+| CI/CD | GitHub Actions → AWS EC2 |
+| Testing | pytest, pytest-cov, httpx |
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Client["Client / React SPA"] -->|HTTP| Nginx["nginx<br/>reverse proxy"]
+    Nginx -->|"/app/"| Static["Static React build"]
+    Nginx -->|"/api, /docs, /health"| API["FastAPI (uvicorn)<br/>auth · RBAC · routers"]
+    API -->|SQLAlchemy| DB[("PostgreSQL")]
+    API -->|audit writes| DB
+    API -->|cache| Redis[("Redis")]
+```
+
+Full diagrams (auth flow, request lifecycle, ER model, audit flow) are in
+**[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+
+## Screenshots
+
+> _Placeholders — drop images into `docs/screenshots/` and update the paths below._
+
+| Login | Dashboard |
+|-------|-----------|
+| ![Login](docs/screenshots/login.png) | ![Dashboard](docs/screenshots/dashboard.png) |
+
+| Devices | Audit logs |
+|---------|------------|
+| ![Devices](docs/screenshots/devices.png) | ![Audit logs](docs/screenshots/audit-logs.png) |
+
+## Documentation
+
+| Guide | Contents |
+|-------|----------|
+| [docs/API.md](docs/API.md) | Auth flow, endpoint catalog, request/response & error examples |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Structure, auth & request lifecycle, ER + audit diagrams |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Docker, Compose, env vars, AWS workflow, nginx, tests |
+| [docs/PERFORMANCE.md](docs/PERFORMANCE.md) | Redis cache, background tasks, indexes |
+| [docs/CICD.md](docs/CICD.md) · [docs/EC2_SETUP.md](docs/EC2_SETUP.md) · [docs/MONITORING.md](docs/MONITORING.md) | CI/CD, server setup, monitoring |
+
 ## Project layout
 
 ```
@@ -17,7 +86,11 @@ Internal infrastructure management platform: FastAPI API, PostgreSQL, JWT authen
 ├── deploy/nginx/               # Reverse proxy config + static error pages
 ├── .github/workflows/          # CI + deploy to EC2
 ├── scripts/                    # deploy.sh, monitor.sh
+├── tests/                      # pytest unit + integration suites (SQLite test DB)
 ├── docs/
+│   ├── API.md                  # Endpoint catalog + request/response examples
+│   ├── ARCHITECTURE.md         # Structure, flows, ER + audit diagrams (Mermaid)
+│   ├── DEPLOYMENT.md           # Docker, Compose, env vars, AWS, nginx, tests
 │   ├── PERFORMANCE.md          # Redis cache, background tasks, indexes
 │   ├── DOCKER.md               # Docker networking, volumes, operations
 │   ├── NGINX.md                # Reverse proxy, HTTPS prep, debugging
@@ -161,7 +234,31 @@ API: http://localhost:8000 · Swagger: http://localhost:8000/docs
 
 Use Swagger at http://localhost/docs (Docker + nginx) or http://localhost:8000/docs (local/direct API). Authorize with the token from `/token`.
 
-**Health endpoints:** `GET /health` (liveness) · `GET /health/ready` (API + database).
+**Health endpoints:** `GET /health` (overall status) · `GET /health/live` (process liveness) · `GET /health/ready` (API + database).
+
+## Testing
+
+Tests use an in-memory SQLite database, so the Docker stack does not need to be running.
+
+```powershell
+# From the repo root
+pip install -r requirements.txt -r requirements-dev.txt
+pytest                                   # full suite
+pytest -m unit                           # fast unit tests
+pytest -m integration                    # API + DB integration tests
+pytest --cov=app --cov-report=term-missing
+```
+
+No local Python 3.12? Run them inside the API image:
+
+```bash
+docker run --rm --user root -v "$PWD:/work" -w /work nexventory-api \
+  sh -c "pip install -q pytest pytest-cov httpx && pytest --cov=app"
+```
+
+Test layout: `tests/unit/` (auth, JWT, RBAC, validation, device/audit CRUD) and
+`tests/integration/` (health, auth flow, devices, role enforcement, audit persistence).
+See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** for more.
 
 ## Dependencies
 

@@ -18,6 +18,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from core.request_context import get_request_id
+
 # HTTP status code -> stable machine-readable error code
 STATUS_CODE_MAP: dict[int, str] = {
     400: "BAD_REQUEST",
@@ -51,6 +53,10 @@ def error_payload(
         # `detail` retained so older clients and FastAPI conventions still work
         "detail": message,
     }
+    # Additive correlation id for support/debugging; clients may ignore it.
+    request_id = get_request_id()
+    if request_id is not None:
+        body["request_id"] = request_id
     if errors is not None:
         body["errors"] = errors
     return body

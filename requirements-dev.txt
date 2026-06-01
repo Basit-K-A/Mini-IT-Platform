@@ -1,0 +1,11 @@
+# Test / development dependencies (NOT installed into the production image).
+# Install: pip install -r requirements.txt -r requirements-dev.txt
+#
+# These cover the Week 3 testing strategy: unit + integration tests with pytest,
+# coverage reporting, and the httpx client used by FastAPI's TestClient.
+
+-r requirements.txt
+
+pytest==8.3.4
+pytest-cov==6.0.0
+httpx==0.28.1

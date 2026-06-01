@@ -17,10 +17,17 @@ from database import get_db
 router = APIRouter(tags=["health"])
 
 
-@router.get("/health")
+@router.get(
+    "/health",
+    summary="Overall application status",
+    description=(
+        "Lightweight overall status of the API process. Does not touch the database, "
+        "so it stays fast and is safe for Docker/nginx health checks."
+    ),
+)
 @limiter.exempt
-async def health_liveness(request: Request):
-    """Process is up — does not check the database."""
+async def health_overall(request: Request):
+    """Overall application status — process is up; does not check the database."""
     return {
         "status": "ok",
         "service": "nexventory-api",
@@ -29,7 +36,28 @@ async def health_liveness(request: Request):
     }
 
 
-@router.get("/health/ready")
+@router.get(
+    "/health/live",
+    summary="Liveness probe",
+    description=(
+        "Confirms the application process is running and able to handle requests. "
+        "Does not check the database — use /health/ready for dependency checks."
+    ),
+)
+@limiter.exempt
+async def health_liveness(request: Request):
+    """Liveness — the process is alive and serving requests."""
+    return {"status": "alive"}
+
+
+@router.get(
+    "/health/ready",
+    summary="Readiness probe",
+    description=(
+        "Confirms the API can serve traffic and reach PostgreSQL. Returns 503 when the "
+        "database is unreachable. Redis is reported but treated as optional (degraded)."
+    ),
+)
 @limiter.exempt
 async def health_readiness(request: Request, db: Session = Depends(get_db)):
     """API can serve traffic and reach PostgreSQL (and optionally Redis)."""

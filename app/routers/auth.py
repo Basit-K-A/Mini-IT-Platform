@@ -36,7 +36,32 @@ _REGISTER_LIMIT = os.getenv("RATE_LIMIT_REGISTER", "10/minute")
 _REFRESH_LIMIT = os.getenv("RATE_LIMIT_REFRESH", "10/minute")
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Register a new account",
+    response_description="The newly created user (without password)",
+    responses={
+        201: {
+            "description": "Account created",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": 12,
+                        "username": "newuser",
+                        "email": "newuser@example.com",
+                        "role": "viewer",
+                        "is_active": True,
+                        "created_at": "2026-06-01T12:00:00Z",
+                    }
+                }
+            },
+        },
+        400: {"description": "Username or email already registered"},
+        422: {"description": "Validation error (weak password, invalid fields)"},
+    },
+)
 @limiter.limit(_REGISTER_LIMIT)
 def register_user(
     request: Request,
@@ -55,7 +80,28 @@ def register_user(
     return user_crud.create_user(db, registration, hashed_password)
 
 
-@router.post("/token", response_model=Token)
+@router.post(
+    "/token",
+    response_model=Token,
+    summary="Log in (OAuth2 password flow)",
+    response_description="Access + refresh token pair",
+    responses={
+        200: {
+            "content": {
+                "application/json": {
+                    "example": {
+                        "access_token": "eyJhbGciOiJIUzI1NiIsIn...",
+                        "refresh_token": "eyJhbGciOiJIUzI1NiIsIn...",
+                        "token_type": "bearer",
+                        "expires_in": 900,
+                    }
+                }
+            }
+        },
+        401: {"description": "Incorrect username or password"},
+        429: {"description": "Too many failed attempts (rate limited / locked out)"},
+    },
+)
 @limiter.limit(_LOGIN_LIMIT)
 async def login_for_access_token(
     request: Request,
@@ -114,7 +160,13 @@ async def login_for_access_token(
     return issue_token_pair(user.username)
 
 
-@router.post("/token/refresh", response_model=Token)
+@router.post(
+    "/token/refresh",
+    response_model=Token,
+    summary="Refresh access token",
+    response_description="A new access + refresh token pair",
+    responses={401: {"description": "Invalid or expired refresh token"}},
+)
 @limiter.limit(_REFRESH_LIMIT)
 async def refresh_access_token(
     request: Request,
@@ -161,14 +213,21 @@ async def refresh_access_token(
     return tokens
 
 
-@router.get("/users/me/", response_model=UserResponse)
+@router.get(
+    "/users/me/",
+    response_model=UserResponse,
+    summary="Get current user",
+    response_description="The authenticated user's profile",
+    responses={401: {"description": "Missing or invalid access token"}},
+)
 async def read_users_me(
     current_user: Annotated[User, Depends(get_current_active_user)],
 ):
+    """Return the profile of the currently authenticated user."""
     return current_user
 
 
-@router.get("/users/me/items/")
+@router.get("/users/me/items/", summary="Example protected resource")
 async def read_own_items(
     current_user: Annotated[User, Depends(get_current_active_user)],
 ):

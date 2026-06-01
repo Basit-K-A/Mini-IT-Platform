@@ -22,6 +22,7 @@ from auth.jwt_handler import (
     validate_access_token,
 )
 from constants.audit_actions import AuditAction
+from core.request_context import set_user_id
 from crud import user as user_crud
 from database import get_db
 from models.user import User
@@ -94,6 +95,8 @@ async def get_current_user(
             details=f"unknown_subject={username}",
         )
         raise credentials_exception
+    # Bind the authenticated user to the logging context (additive metadata only).
+    set_user_id(user.id)
     return user
 
 
