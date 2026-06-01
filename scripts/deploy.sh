@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Nexventory — production deploy script (run on EC2 after git pull)
+# Nexventory — production backend deploy (API, DB, Redis, nginx) on EC2.
+# Frontend static files are deployed by scripts/deploy-frontend.sh (GitHub Actions or manual).
 set -euo pipefail
 
 DEPLOY_DIR="${DEPLOY_DIR:-$(cd "$(dirname "$0")/.." && pwd)}"
@@ -8,24 +9,14 @@ COMPOSE_FILES="-f docker-compose.yml -f docker-compose.prod.yml"
 
 cd "$DEPLOY_DIR"
 
-echo "==> Deploying Nexventory in $DEPLOY_DIR"
+echo "==> Deploying Nexventory backend in $DEPLOY_DIR"
 
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "ERROR: $ENV_FILE not found. Copy .env.prod.example to .env.prod on the server."
   exit 1
 fi
 
-echo "==> Pulling latest code"
-git pull origin main
-
-if [[ -f frontend/package.json ]]; then
-  echo "==> Building React UI (served at /app/)"
-  (cd frontend && npm ci && npm run build)
-  if [[ ! -f frontend/dist/index.html ]]; then
-    echo "ERROR: frontend/dist/index.html missing after build."
-    exit 1
-  fi
-fi
+"$(dirname "$0")/sync-repo.sh"
 
 echo "==> Building and starting containers"
 docker compose --env-file "$ENV_FILE" $COMPOSE_FILES up -d --build --remove-orphans
@@ -38,4 +29,4 @@ sleep 5
 curl -sf "http://localhost/health/ready" && echo ""
 curl -sf "http://localhost/health" && echo ""
 
-echo "==> Deploy complete"
+echo "==> Backend deploy complete (run deploy-frontend for UI assets)"

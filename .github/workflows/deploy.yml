@@ -1,4 +1,4 @@
-# Build on GitHub, then deploy to AWS EC2 via SSH
+# Build on GitHub, deploy backend + frontend to AWS EC2 via SSH/SCP
 name: Deploy to EC2
 
 on:
@@ -19,12 +19,12 @@ jobs:
       - name: Build production images
         run: docker compose -f docker-compose.yml -f docker-compose.prod.yml build
 
-  deploy:
-    name: Deploy to EC2
+  deploy-backend:
+    name: Deploy backend to EC2
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy over SSH
+      - name: Deploy backend over SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.EC2_HOST }}
@@ -35,5 +35,68 @@ jobs:
           script: |
             set -e
             cd "${{ secrets.EC2_DEPLOY_PATH }}"
-            chmod +x scripts/deploy.sh
+            chmod +x scripts/deploy.sh scripts/sync-repo.sh
             ./scripts/deploy.sh
+
+  deploy-frontend:
+    name: Deploy frontend to EC2
+    needs: deploy-backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build React app
+        working-directory: frontend
+        env:
+          VITE_API_URL: /api
+        run: npm ci && npm run build
+
+      - name: Verify build output
+        run: test -f frontend/dist/index.html
+
+      - name: Prepare dist directory on EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script_stop: true
+          script: |
+            set -e
+            DIST="${{ secrets.EC2_DEPLOY_PATH }}/frontend/dist"
+            mkdir -p "$DIST"
+            rm -rf "$DIST"/*
+
+      - name: Upload dist to EC2
+        uses: appleboy/scp-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          source: frontend/dist
+          target: ${{ secrets.EC2_DEPLOY_PATH }}/frontend
+          overwrite: true
+
+      - name: Reload nginx on EC2
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script_stop: true
+          script: |
+            set -e
+            cd "${{ secrets.EC2_DEPLOY_PATH }}"
+            chmod +x scripts/deploy-frontend.sh
+            ./scripts/deploy-frontend.sh --reload-only

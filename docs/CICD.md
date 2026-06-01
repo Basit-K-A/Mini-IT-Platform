@@ -17,12 +17,14 @@ Developer: git push origin main
         ▼
 GitHub Actions (ubuntu-latest)
   ├─ job: build — docker compose config + build
-  └─ job: deploy — SSH → EC2 → scripts/deploy.sh
+  ├─ job: deploy-backend — SSH → EC2 → scripts/deploy.sh (git sync + Docker)
+  └─ job: deploy-frontend — npm build → SCP dist → reload nginx
         │
         ▼
 EC2 Ubuntu
-  ├─ git pull origin main
-  └─ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+  ├─ git fetch + reset --hard origin/main (no merge conflicts)
+  ├─ docker compose up -d --build
+  └─ frontend/dist from CI → http://EC2_HOST/app/
 ```
 
 ## GitHub Secrets (required)
@@ -119,7 +121,8 @@ On EC2:
 
 ```bash
 cd /home/ubuntu/Mini-IT-Platform
-./scripts/deploy.sh
+./scripts/deploy.sh          # backend (git sync + Docker)
+./scripts/deploy-frontend.sh # UI (npm build on server, or upload dist first)
 ```
 
 ## Troubleshooting CI/CD
@@ -127,7 +130,8 @@ cd /home/ubuntu/Mini-IT-Platform
 | Issue | Fix |
 |-------|-----|
 | `Permission denied (publickey)` | Check `EC2_SSH_KEY` secret (full PEM/OpenSSH private key, including headers) |
-| `git pull` fails on EC2 | Configure deploy key or credentials on the server |
+| `git pull` / merge conflicts on EC2 | Deploy uses `scripts/sync-repo.sh` (`git reset --hard origin/main`). Commit and push local changes instead of editing on the server |
+| `untracked ... would be overwritten` | Same — reset/clean via deploy, or run `git fetch origin main && git reset --hard origin/main && git clean -fd` once on EC2 |
 | Deploy succeeds but 502 | Run `docker compose logs api` on EC2; check `.env.prod` passwords |
 | Build fails on GitHub | Open Actions tab → failed job → logs |
 | Port 80 not reachable | EC2 security group: allow HTTP (80) from `0.0.0.0/0` or your IP |
