@@ -29,8 +29,20 @@ else
 fi
 
 if [[ ! -f frontend/dist/index.html ]]; then
-  echo "ERROR: frontend/dist/index.html missing after build."
-  exit 1
+  echo "ERROR: frontend/dist/index.html not found at $DEPLOY_DIR/frontend/dist/"
+  echo "Contents of frontend/:"
+  ls -la frontend/ 2>/dev/null || true
+  # Recover if a previous scp dropped files directly under frontend/ (not frontend/dist/)
+  if [[ -f frontend/index.html ]]; then
+    echo "==> Found index.html in frontend/ — moving into frontend/dist/"
+    mkdir -p frontend/dist
+    for item in index.html assets favicon.svg; do
+      [[ -e "frontend/${item}" ]] && mv "frontend/${item}" frontend/dist/
+    done
+  fi
+  if [[ ! -f frontend/dist/index.html ]]; then
+    exit 1
+  fi
 fi
 
 echo "==> Reloading nginx to pick up static files"

@@ -1,4 +1,4 @@
-# Build on GitHub, deploy backend + frontend to AWS EC2 via SSH/SCP
+# Build on GitHub, deploy backend + frontend to AWS EC2 via SSH
 name: Deploy to EC2
 
 on:
@@ -62,41 +62,33 @@ jobs:
       - name: Verify build output
         run: test -f frontend/dist/index.html
 
-      - name: Prepare dist directory on EC2
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          script_stop: true
-          script: |
-            set -e
-            DIST="${{ secrets.EC2_DEPLOY_PATH }}/frontend/dist"
-            mkdir -p "$DIST"
-            rm -rf "$DIST"/*
+      - name: Upload dist and reload nginx
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_DEPLOY_PATH: ${{ secrets.EC2_DEPLOY_PATH }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$EC2_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Upload dist to EC2
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          source: frontend/dist
-          target: ${{ secrets.EC2_DEPLOY_PATH }}/frontend
-          overwrite: true
+          SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o BatchMode=yes"
+          REMOTE="${EC2_USER}@${EC2_HOST}"
+          DIST_PATH="${EC2_DEPLOY_PATH}/frontend/dist"
 
-      - name: Reload nginx on EC2
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          script_stop: true
-          script: |
-            set -e
-            cd "${{ secrets.EC2_DEPLOY_PATH }}"
-            chmod +x scripts/deploy-frontend.sh
-            ./scripts/deploy-frontend.sh --reload-only
+          echo "==> Preparing ${DIST_PATH} on EC2"
+          ssh $SSH_OPTS "$REMOTE" "mkdir -p '${DIST_PATH}' && rm -rf '${DIST_PATH:?}'/*"
+
+          echo "==> Rsync frontend/dist/ to EC2 (trailing slash copies contents into dist/)"
+          rsync -avz --delete -e "ssh $SSH_OPTS" \
+            frontend/dist/ "${REMOTE}:${DIST_PATH}/"
+
+          echo "==> Verify index.html on server"
+          ssh $SSH_OPTS "$REMOTE" "test -f '${DIST_PATH}/index.html' && ls -la '${DIST_PATH}' | head -20"
+
+          echo "==> Reload nginx"
+          ssh $SSH_OPTS "$REMOTE" \
+            "cd '${EC2_DEPLOY_PATH}' && chmod +x scripts/deploy-frontend.sh && ./scripts/deploy-frontend.sh --reload-only"

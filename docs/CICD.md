@@ -18,7 +18,7 @@ Developer: git push origin main
 GitHub Actions (ubuntu-latest)
   ├─ job: build — docker compose config + build
   ├─ job: deploy-backend — SSH → EC2 → scripts/deploy.sh (git sync + Docker)
-  └─ job: deploy-frontend — npm build → SCP dist → reload nginx
+  └─ job: deploy-frontend — npm build → rsync dist/ → reload nginx
         │
         ▼
 EC2 Ubuntu
