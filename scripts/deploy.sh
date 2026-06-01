@@ -18,6 +18,15 @@ fi
 echo "==> Pulling latest code"
 git pull origin main
 
+if [[ -f frontend/package.json ]]; then
+  echo "==> Building React UI (served at /app/)"
+  (cd frontend && npm ci && npm run build)
+  if [[ ! -f frontend/dist/index.html ]]; then
+    echo "ERROR: frontend/dist/index.html missing after build."
+    exit 1
+  fi
+fi
+
 echo "==> Building and starting containers"
 docker compose --env-file "$ENV_FILE" $COMPOSE_FILES up -d --build --remove-orphans
 

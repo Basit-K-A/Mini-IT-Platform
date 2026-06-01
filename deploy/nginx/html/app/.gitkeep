@@ -1,0 +1,2 @@
+# React build output is mounted from ../../frontend/dist (see docker-compose.yml).
+# Run: cd frontend && npm run build

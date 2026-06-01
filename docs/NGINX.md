@@ -48,10 +48,14 @@ docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.y
 
 | URL | Description |
 |-----|-------------|
+| http://localhost/app/ | React dashboard (after `cd frontend && npm run build`) |
+| http://localhost/api/… | API via nginx prefix (use `VITE_API_URL=/api` in production) |
 | http://localhost/docs | Swagger (via nginx) |
 | http://localhost/health | Liveness |
 | http://localhost/health/ready | Readiness (DB + API) |
 | http://localhost:8000/docs | Dev only — direct API (bypass nginx) |
+
+Production UI: build with `npm run build` in `frontend/` (base path `/app/`), then start Compose so `frontend/dist` is mounted into nginx at `/usr/share/nginx/html/app`.
 
 ## Verify routing
 

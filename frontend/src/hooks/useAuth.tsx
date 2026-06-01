@@ -11,6 +11,7 @@ import { fetchCurrentUser, logout as apiLogout } from '../api/auth'
 import { clearTokens, getToken, setUnauthorizedHandler } from '../api/client'
 import type { User } from '../types/user'
 import { getPermissions, homeRouteForRole, type Permissions } from '../utils/permissions'
+import { toAppPath } from '../utils/paths'
 
 interface AuthContextValue {
   user: User | null
@@ -49,8 +50,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setUnauthorizedHandler(() => {
       setUser(null)
-      if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
-        window.location.assign('/login')
+      const path = window.location.pathname
+      const loginPath = toAppPath('/login')
+      const registerPath = toAppPath('/register')
+      if (!path.endsWith(loginPath) && !path.endsWith(registerPath)) {
+        window.location.assign(loginPath)
       }
     })
     refreshUser().finally(() => setLoading(false))
