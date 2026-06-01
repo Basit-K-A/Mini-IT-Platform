@@ -11,15 +11,12 @@ const isDev = import.meta.env.DEV
 
 /**
  * API base URL (no trailing slash).
- * Dev default `/api` uses the Vite proxy → http://127.0.0.1:8000 (no CORS).
+ * Default `/api` matches nginx on EC2 (location /api/ → FastAPI) and Vite dev proxy.
  */
 export function getApiBaseUrl(): string {
   const raw = import.meta.env.VITE_API_URL
   if (raw === undefined || raw === '') {
-    if (isDev) {
-      return '/api'
-    }
-    return ''
+    return '/api'
   }
   return String(raw).replace(/\/$/, '')
 }
@@ -113,6 +110,9 @@ export async function apiRequest<T>(
 
   let fetchBody: BodyInit | undefined
   if (body instanceof FormData || body instanceof URLSearchParams) {
+    if (body instanceof URLSearchParams && !headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/x-www-form-urlencoded')
+    }
     fetchBody = body
   } else if (body !== undefined) {
     if (!headers.has('Content-Type')) {
